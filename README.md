@@ -1,12 +1,20 @@
 # NitroPulse 1.0.12 — monitor portable de recursos para Windows
 
+## Descargar y usar
+
+### [⬇ Descargar NitroPulse.exe para Windows x64](https://github.com/fpertuznet/NitroPulse/releases/latest/download/NitroPulse.exe)
+
+Descarga ese único archivo, guárdalo en una carpeta propia y ábrelo. **No necesitas descargar el código fuente, descomprimir un ZIP ni instalar .NET.** Si otra versión está abierta, ciérrala con **Salir** desde los indicadores junto al reloj.
+
+Si necesitas el paquete con documentación y licencias, también está disponible en [Releases](https://github.com/fpertuznet/NitroPulse/releases). Los archivos «Source code» son para desarrolladores, no para ejecutar la aplicación.
+
 Proyecto de código abierto: https://github.com/fpertuznet/NitroPulse. Código propio bajo licencia MIT; las dependencias mantienen sus propias licencias.
 
 Descarga las versiones portables desde https://github.com/fpertuznet/NitroPulse/releases. Las actualizaciones se descargan en segundo plano y, después de verificarse, aparece **Actualización disponible · Instalar** en el panel y el menú junto al reloj. No se instala hasta pulsar ese botón. Consulta ACTUALIZACIONES.md.
 
 El nuevo icono aparece en el ejecutable y en la ventana principal. Iconos contiene el original PNG y el ICO con tamaños de 16 a 256 píxeles. Los indicadores de temperatura y uso junto al reloj conservan sus números y barras.
 
-Extrae el ZIP y abre Aplicacion/NitroPulse.exe. No necesita .NET instalado ni un acceso directo con rutas fijas.
+La descarga recomendada es NitroPulse.exe. Si eliges el ZIP opcional, extrae todo y abre Aplicacion/NitroPulse.exe.
 
 - Si falta PawnIO, el programa pregunta si deseas instalar la edición oficial firmada 2.2. El instalador está incluido, sin necesidad de conexión a Internet.
 - Al aceptar, Windows solicita autorización de administrador. El programa instala PawnIO y abre el monitor con lectura CPU directa.
