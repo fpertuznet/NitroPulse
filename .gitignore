@@ -1,0 +1,10 @@
+# Compilaciones locales y registros
+**/bin/
+**/obj/
+Aplicacion/
+*.pdb
+*.zip
+*.log
+.vs/
+
+# Resources/PawnIO_setup.exe se conserva: dependencia oficial incluida.

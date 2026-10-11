@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <AssemblyName>NitroPulse</AssemblyName>
+    <RootNamespace>NitroPulse</RootNamespace>
+    <Version>1.0.12</Version>
+    <GitHubRepository>fpertuznet/NitroPulse</GitHubRepository>
+    <ApplicationIcon>Resources/NitroPulse.ico</ApplicationIcon>
+    <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
+  </PropertyGroup>
+  <ItemGroup>
+    <AssemblyMetadata Include="GitHubRepository" Value="$(GitHubRepository)" />
+    <PackageReference Include="LibreHardwareMonitorLib" Version="0.9.6" />
+    <EmbeddedResource Include="Resources/PawnIO_setup.exe" LogicalName="NitroPulse.PawnIO_setup.exe" />
+    <EmbeddedResource Include="Install-Update.ps1" LogicalName="NitroPulse.Install-Update.ps1" />
+  </ItemGroup>
+  <Target Name="ValidateReleaseVersion" BeforeTargets="CoreCompile" Condition="'$(DesignTimeBuild)' != 'true'">
+    <Exec Command="powershell.exe -NoProfile -File &quot;$(MSBuildProjectDirectory)\Validate-Version.ps1&quot; -Mode Validate -ProjectDirectory &quot;$(MSBuildProjectDirectory)&quot; -Version &quot;$(Version)&quot;" />
+  </Target>
+  <Target Name="RecordReleaseVersion" AfterTargets="Publish">
+    <Exec Command="powershell.exe -NoProfile -File &quot;$(MSBuildProjectDirectory)\Validate-Version.ps1&quot; -Mode Record -ProjectDirectory &quot;$(MSBuildProjectDirectory)&quot; -Version &quot;$(Version)&quot;" />
+  </Target>
+</Project>
