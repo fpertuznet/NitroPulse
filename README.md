@@ -2,9 +2,9 @@
 
 ## Descargar y usar
 
-### [⬇ Descargar NitroPulse.exe para Windows x64](https://github.com/fpertuznet/NitroPulse/releases/latest/download/NitroPulse.exe)
+### Descargar desde Releases
 
-Descarga ese único archivo, guárdalo en una carpeta propia y ábrelo. **No necesitas descargar el código fuente, descomprimir un ZIP ni instalar .NET.** Si otra versión está abierta, ciérrala con **Salir** desde los indicadores junto al reloj.
+Visita la página de [Releases](https://github.com/fpertuznet/NitroPulse/releases), descarga el ejecutable publicado allí, guárdalo en una carpeta propia y ábrelo. **No necesitas descargar el código fuente, descomprimir un ZIP ni instalar .NET.** Si otra versión está abierta, ciérrala con **Salir** desde los indicadores junto al reloj.
 
 Si necesitas el paquete con documentación y licencias, también está disponible en [Releases](https://github.com/fpertuznet/NitroPulse/releases). Los archivos «Source code» son para desarrolladores, no para ejecutar la aplicación.
 
