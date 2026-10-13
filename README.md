@@ -4,7 +4,7 @@
 
 ### Descargar desde Releases
 
-Visita la página de [Releases](https://github.com/fpertuznet/NitroPulse/releases) y descarga el ejecutable publicado allí. Guárdalo en una carpeta propia y ábrelo. **No necesitas descargar el código fuente, descomprimir un ZIP ni instalar .NET.** Si otra versión está abierta, ciérrala con **Salir** desde los indicadores junto al reloj.
+Visita la página de [Releases](https://github.com/fpertuznet/NitroPulse/releases), descarga el ejecutable publicado allí, guárdalo en una carpeta propia y ábrelo. **No necesitas descargar el código fuente, descomprimir un ZIP ni instalar .NET.** Si otra versión está abierta, ciérrala con **Salir** desde los indicadores junto al reloj.
 
 Si necesitas el paquete con documentación y licencias, también está disponible en [Releases](https://github.com/fpertuznet/NitroPulse/releases). Los archivos «Source code» son para desarrolladores, no para ejecutar la aplicación.
 
