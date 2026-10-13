@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType><TargetFramework>net8.0-windows</TargetFramework><UseWindowsForms>true</UseWindowsForms>
+    <ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../../Fuente/Models.cs" Link="Models.cs" />
+    <Compile Include="../../Fuente/NoticesPanel.cs" Link="NoticesPanel.cs" />
+    <EmbeddedResource Include="../../PRIVACIDAD.md" LogicalName="NitroPulse.Avisos.PRIVACIDAD.md" />
+    <EmbeddedResource Include="../../LICENSE" LogicalName="NitroPulse.Avisos.LICENSE" />
+    <EmbeddedResource Include="../../Licencias/*" LogicalName="NitroPulse.Avisos.%(Filename)%(Extension)" />
+  </ItemGroup>
+</Project>

@@ -171,6 +171,8 @@ internal sealed class CsvLogger : IDisposable
             "Sistema: " + Environment.OSVersion.VersionString,
             "Núcleos lógicos visibles: " + Environment.ProcessorCount,
             "Frecuencia: sistema ~2 segundos, procesos ~15 segundos",
+            $"Estabilidad de red: pruebas cada {NetworkMonitor.IntervalSeconds} segundos; registro independiente, se pausa desde la pestaña Red.",
+            "Red: SSID/BSSID, interfaces, IP/router/DNS y pruebas sintéticas ICMP/TCP/DNS. Revisar esos datos antes de compartir.",
             "CSV: guardado inmediato; sincronización con disco aproximadamente cada 10 segundos.",
             $"ZIP automático cada {AutomaticBackupMinutes} minutos (copias renovadas de forma segura).",
             "Al elegir Salir, exportación ZIP final. En apagados bruscos se conservan los CSV sincronizados.",

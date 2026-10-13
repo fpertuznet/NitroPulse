@@ -6,5 +6,21 @@ Aplicacion/
 *.zip
 *.log
 .vs/
+Diagnosticos/
+Paquetes/
+Sesiones/
+Exportaciones/
+**/fixtures-*/
+**/red_*.csv
+**/red_*.jsonl
+**/red_nombres.json
+**/sistema.csv
+**/procesos.csv
+**/Informe_red.txt
+*.dmp
+*.bak
+.env
+.env.*
+!.env.example
 
 # Resources/PawnIO_setup.exe se conserva: dependencia oficial incluida.

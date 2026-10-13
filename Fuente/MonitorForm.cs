@@ -12,6 +12,9 @@ internal sealed class MonitorForm : Form
     private readonly WindowsCounters _counters = new();
     private readonly ProcessSampler _processSampler = new();
     private readonly CsvLogger _logger = new();
+    private readonly NetworkMonitor _network;
+    private readonly TabControl _pages;
+    private readonly NetworkPanel _networkPanel;
     private readonly List<MetricSnapshot> _history = new();
     private readonly List<NotifyIcon> _trayIcons = new();
     private readonly string[] _lastTrayText = new string[5];
@@ -60,7 +63,8 @@ internal sealed class MonitorForm : Form
     public MonitorForm(bool safeMode = true)
     {
         _hardware = new HardwareReader(safeMode);
-        Text = "NitroPulse " + AppVersion.Display + " · Monitor de recursos";
+        _network = new NetworkMonitor(_logger.SessionDirectory);
+        Text = "NitroPulse " + AppVersion.Display + " · Recursos y red";
         Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath);
         Size = new Size(1080, 780);
         MinimumSize = new Size(855, 650);
@@ -69,7 +73,14 @@ internal sealed class MonitorForm : Form
         ForeColor = Theme.Text;
         Font = new Font("Segoe UI", 9.5f);
 
-        // Main layout: header, five cards, two time series, process table, footer.
+        _pages = NitroTabs.Create();
+        var resourcesPage = new TabPage("Recursos") { BackColor = Theme.Bg };
+        var networkPage = new TabPage("Red") { BackColor = Theme.Bg };
+        _networkPanel = new NetworkPanel(_network); networkPage.Controls.Add(_networkPanel);
+        _pages.TabPages.Add(resourcesPage); _pages.TabPages.Add(networkPage); Controls.Add(_pages);
+        var noticesPage = new TabPage("Privacidad y licencias") { BackColor = Theme.Bg };
+        noticesPage.Controls.Add(new NoticesPanel()); _pages.TabPages.Add(noticesPage);
+        // Resource monitoring remains independent of the network tab.
         var root = new TableLayoutPanel
         {
             Dock = DockStyle.Fill,
@@ -78,12 +89,13 @@ internal sealed class MonitorForm : Form
             Padding = new Padding(18, 12, 18, 8),
             BackColor = Theme.Bg
         };
+        root.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         root.RowStyles.Add(new RowStyle(SizeType.Absolute, 74));
         root.RowStyles.Add(new RowStyle(SizeType.Absolute, 144));
         root.RowStyles.Add(new RowStyle(SizeType.Absolute, 228));
         root.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
         root.RowStyles.Add(new RowStyle(SizeType.Absolute, 53));
-        Controls.Add(root);
+        resourcesPage.Controls.Add(root);
 
         var header = new Panel { Dock = DockStyle.Fill, BackColor = Theme.Bg };
         var heading = new Label
@@ -107,6 +119,7 @@ internal sealed class MonitorForm : Form
         header.Controls.AddRange(new Control[] { heading, tagline, _status });
         _installUpdate.Location = new Point(335, 38);
         _installUpdate.Click += async (_, _) => await InstallUpdateAsync();
+        LucideIcons.Apply(_installUpdate, "download");
         header.Controls.Add(_installUpdate);
         root.Controls.Add(header, 0, 0);
 
@@ -184,6 +197,7 @@ internal sealed class MonitorForm : Form
         _updateTimer.Tick += async (_, _) => await CheckUpdatesAsync();
         Shown += async (_, _) =>
         {
+            _network.Start();
             if (Environment.GetCommandLineArgs().Any(a => a.Equals("--minimized", StringComparison.OrdinalIgnoreCase)))
                 BeginInvoke(new Action(HideToTray));
             await SampleAsync();
@@ -204,6 +218,7 @@ internal sealed class MonitorForm : Form
             Font = new Font("Segoe UI", 9, FontStyle.Bold)
         };
         b.FlatAppearance.BorderSize = 0;
+        LucideIcons.Apply(b, LucideIcons.ForText(text));
         b.Click += (_, _) => action();
         return b;
     }
@@ -270,13 +285,23 @@ internal sealed class MonitorForm : Form
             OpenFolder(_logger.FinalBackupDirectory);
         }));
         _trayMenu.Items.Add(new ToolStripMenuItem("Ver sensores detectados", null, (_, _) => ShowSensors()));
+        _trayMenu.Items.Add(new ToolStripMenuItem("Red / Internet · diagnóstico", null, (_, _) => ShowNetwork()));
         _trayMenu.Items.Add(new ToolStripMenuItem("Actualizaciones · " + AppVersion.Display, null, (_, _) => ShowUpdates()));
+        _trayMenu.Items.Add(new ToolStripMenuItem("Privacidad y licencias", null, (_, _) => { _pages.SelectedIndex = 2; ShowDashboard(); }));
         _installUpdateMenu = new ToolStripMenuItem("Actualización disponible · Instalar", null, async (_, _) => await InstallUpdateAsync()) { Visible = false };
         _trayMenu.Items.Add(_installUpdateMenu);
         _trayMenu.Items.Add(new ToolStripSeparator());
         _trayMenu.Items.Add(_autoStart);
         _trayMenu.Items.Add(new ToolStripSeparator());
         _trayMenu.Items.Add(new ToolStripMenuItem("Salir", null, async (_, _) => await ExitAsync()));
+        _trayMenu.ImageScalingSize = new Size(18, 18);
+        foreach (var item in _trayMenu.Items.OfType<ToolStripMenuItem>())
+        {
+            string caption = item.Text ?? "";
+            string icon = caption.StartsWith("Abrir panel") ? "monitor" : caption.StartsWith("Abrir") ? "folder-open" :
+                caption.StartsWith("Red") ? "network" : caption is "Salir" or "Iniciar con Windows" ? "power" : LucideIcons.ForText(caption);
+            item.Image = LucideIcons.Get(icon, item.ForeColor, 18);
+        }
     }
 
     private void SetupTrayIcons()
@@ -420,7 +445,8 @@ internal sealed class MonitorForm : Form
     {
         _logger.LoggingEnabled = !_logger.LoggingEnabled;
         _pauseButton.Text = _logger.LoggingEnabled ? "Pausar registro" : "Reanudar registro";
-        if (_toggleLogging is not null) _toggleLogging.Text = _pauseButton.Text;
+        LucideIcons.Apply(_pauseButton, _logger.LoggingEnabled ? "pause" : "play");
+        if (_toggleLogging is not null) { _toggleLogging.Text = _pauseButton.Text; _toggleLogging.Image = LucideIcons.Get(_logger.LoggingEnabled ? "pause" : "play", _toggleLogging.ForeColor, 18); }
     }
 
     private void ToggleStartup()
@@ -435,6 +461,7 @@ internal sealed class MonitorForm : Form
 
     private async Task ExportAsync()
     {
+        if (MessageBox.Show(this, "El ZIP contiene métricas, nombres de procesos y datos de diagnóstico del equipo. Se guarda localmente y no se envía automáticamente. Revisa el contenido antes de compartirlo.\n\n¿Crear la exportación?", "NitroPulse · Exportar sesión", MessageBoxButtons.YesNo, MessageBoxIcon.Information, MessageBoxDefaultButton.Button2) != DialogResult.Yes) return;
         try
         {
             string zip = await Task.Run(() => _logger.ExportZip());
@@ -493,6 +520,11 @@ internal sealed class MonitorForm : Form
     {
         using var dialog = new UpdateDialog(SetReadyUpdate);
         dialog.ShowDialog(this);
+    }
+
+    private void ShowNetwork()
+    {
+        _pages.SelectedIndex = 1; _networkPanel.RefreshView(); ShowDashboard();
     }
 
     private async Task CheckUpdatesAsync()
@@ -580,6 +612,7 @@ internal sealed class MonitorForm : Form
             _timer.Stop();
             _updateTimer.Stop();
             _updateCancellation.Cancel();
+            _network.Cancel();
         }
     }
 
@@ -590,6 +623,7 @@ internal sealed class MonitorForm : Form
         _timer.Stop();
         _updateTimer.Stop();
         _updateCancellation.Cancel();
+        await _network.StopAsync();
         _status.Text = "● GUARDANDO SESIÓN FINAL...";
         _status.ForeColor = Theme.Ram;
         // Wait for the in-flight sample and rolling archive before finalizing.
@@ -615,6 +649,7 @@ internal sealed class MonitorForm : Form
         }
         _trayMenu.Dispose();
         _hardware.Dispose();
+        _network.Dispose();
         _counters.Dispose();
         _logger.Dispose();
         if (finalBackupError is not null)

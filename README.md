@@ -1,14 +1,18 @@
-# NitroPulse 1.0.12 — monitor portable de recursos para Windows
+# NitroPulse 1.0.16 — monitor portable de recursos y estabilidad de red para Windows
 
 ## Descargar y usar
 
-### [⬇ Descargar NitroPulse.exe para Windows x64](https://github.com/fpertuznet/NitroPulse/releases/latest/download/NitroPulse.exe)
+### Descargar desde Releases
 
-Descarga ese único archivo, guárdalo en una carpeta propia y ábrelo. **No necesitas descargar el código fuente, descomprimir un ZIP ni instalar .NET.** Si otra versión está abierta, ciérrala con **Salir** desde los indicadores junto al reloj.
+Visita la página de [Releases](https://github.com/fpertuznet/NitroPulse/releases) y descarga el ejecutable publicado allí. Guárdalo en una carpeta propia y ábrelo. **No necesitas descargar el código fuente, descomprimir un ZIP ni instalar .NET.** Si otra versión está abierta, ciérrala con **Salir** desde los indicadores junto al reloj.
 
 Si necesitas el paquete con documentación y licencias, también está disponible en [Releases](https://github.com/fpertuznet/NitroPulse/releases). Los archivos «Source code» son para desarrolladores, no para ejecutar la aplicación.
 
 Proyecto de código abierto: https://github.com/fpertuznet/NitroPulse. Código propio bajo licencia MIT; las dependencias mantienen sus propias licencias.
+
+La versión 1.0.16 incluye espera persistente para consultas de actualización y avisos de privacidad/licencias dentro del ejecutable. Consulta [PRIVACIDAD.md](PRIVACIDAD.md) y [PUBLICACION.md](PUBLICACION.md). NitroPulse es un proyecto independiente; Acer, Intel, NVIDIA y GitHub no lo certifican ni patrocinan.
+
+Desde la versión 1.0.15, **Recursos** y **Red** están en pestañas separadas. Guarda etiquetas por identidad de red, incluye botones con iconos Lucide y una gráfica de ping en vivo con pérdidas y cambios de conexión. El informe específico para el operador contiene también la gráfica. Consulta [RED.md](RED.md).
 
 Descarga las versiones portables desde https://github.com/fpertuznet/NitroPulse/releases. Las actualizaciones se descargan en segundo plano y, después de verificarse, aparece **Actualización disponible · Instalar** en el panel y el menú junto al reloj. No se instala hasta pulsar ese botón. Consulta ACTUALIZACIONES.md.
 
@@ -29,11 +33,17 @@ Para forzar modo seguro: NitroPulse.exe --safe-mode. El argumento --direct-senso
 
 Si hay otra versión de NitroPulse abierta, usa Salir en su menú junto al reloj antes de abrir esta versión. No activa el inicio automático de Windows por su cuenta.
 
+## Organización local de versiones
+
+Los ejecutables anteriores están agrupados por número en `Aplicacion/Versiones`. Los ZIP originales disponibles se conservan en `Paquetes` dentro de cada versión; los informes de validación están en `Documentacion/Versiones`. Consulta [VERSIONES.md](VERSIONES.md) para ver el inventario y las rutas.
+
+La versión local más reciente es `Aplicacion/Versiones/1.0.16/NitroPulse.exe`. Las versiones anteriores se conservan en sus carpetas. Si tienes un acceso directo a una versión anterior, apunta a la versión que quieras usar. No se cambió el inicio automático de Windows. Las fuentes y pruebas actuales permanecen en sus rutas originales.
+
 ## Compilar
 
 Instala el SDK .NET 8 o posterior. Desde esta carpeta:
 
-    dotnet publish Fuente/NitroPulse.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true -o Aplicacion
+    dotnet publish Fuente/NitroPulse.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true -o Aplicacion/Versiones/1.0.16
 
 El código está en Fuente. Resources/PawnIO_setup.exe es el instalador oficial sin modificaciones.
 

@@ -10,14 +10,21 @@ try {
     $current = [version]::new($current.Major, $current.Minor, $current.Build, [Math]::Max(0, $current.Revision))
     $root = [IO.Path]::GetFullPath($ProjectDirectory).TrimEnd('\', '/')
     $stamp = Join-Path $root 'version-publicada.json'
-    $lines = @(Get-ChildItem -LiteralPath $root -Recurse -File | Where-Object {
-        $_.FullName -notmatch '\\(bin|obj)\\' -and $_.Extension -in @('.cs','.csproj','.ps1','.ico','.exe','.json') -and $_.FullName -ne $stamp
-    } | Sort-Object FullName | ForEach-Object {
+    $files = @(Get-ChildItem -LiteralPath $root -Recurse -File | Where-Object {
+        $_.FullName -notmatch '\\(bin|obj)\\' -and $_.Extension -in @('.cs','.csproj','.ps1','.ico','.png','.svg','.exe','.json') -and $_.FullName -ne $stamp
+    })
+    $parent = Split-Path -Parent $root
+    $files += @(Get-Item -LiteralPath (Join-Path $parent 'PRIVACIDAD.md'), (Join-Path $parent 'LICENSE'))
+    $files += @(Get-ChildItem -LiteralPath (Join-Path $parent 'Licencias') -File)
+    $lines = @($files | Sort-Object FullName | ForEach-Object {
         $fileSha = [Security.Cryptography.SHA256]::Create()
         $stream = [IO.File]::OpenRead($_.FullName)
         try { $hash = [BitConverter]::ToString($fileSha.ComputeHash($stream)).Replace('-','') }
         finally { $stream.Dispose(); $fileSha.Dispose() }
-        $_.FullName.Substring($root.Length + 1).Replace('\','/') + ':' + $hash
+        $relative = if ($_.FullName.StartsWith($root + '\', [StringComparison]::OrdinalIgnoreCase)) {
+            $_.FullName.Substring($root.Length + 1)
+        } else { '../' + $_.FullName.Substring($parent.Length + 1) }
+        $relative.Replace('\','/') + ':' + $hash
     })
     $sha = [Security.Cryptography.SHA256]::Create()
     try { $fingerprint = [BitConverter]::ToString($sha.ComputeHash([Text.Encoding]::UTF8.GetBytes(($lines -join "`n")))).Replace('-','') }

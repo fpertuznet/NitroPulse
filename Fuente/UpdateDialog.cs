@@ -30,6 +30,7 @@ internal sealed class UpdateDialog : Form
         _status = new Label { Left = 18, Top = 139, Width = 460, Height = 43, Text = "Configura el repositorio cuando publiques NitroPulse en GitHub." };
         _check = new Button { Text = "Guardar y comprobar", Left = 18, Top = 191, Width = 185 };
         var close = new Button { Text = "Cerrar", Left = 378, Top = 191, Width = 100, DialogResult = DialogResult.Cancel };
+        LucideIcons.Apply(_check, "refresh-cw"); LucideIcons.Apply(close, "x");
         _check.Click += async (_, _) => await CheckAsync();
         Controls.AddRange(new Control[] { _repository, _automatic, _status, _check, close });
         CancelButton = close;

@@ -16,6 +16,9 @@ internal static class InstallerTests
         var release = new ReleaseInfo(version,"v1.0.11", new Uri("https://github.com/test/NitroPulse/releases/tag/v1.0.11"),asset);
         var ready = await UpdateInstaller.DownloadCoreAsync(release, CancellationToken.None, new FakeHandler(bytes), Path.Combine(root,"good"));
         if (ready.Hash != asset.Sha256) throw new Exception("Download did not verify");
+        var reusedHandler = new FakeHandler(Array.Empty<byte>());
+        var reused = await UpdateInstaller.DownloadCoreAsync(release, CancellationToken.None, reusedHandler, Path.Combine(root,"good"));
+        if (reusedHandler.Calls != 0 || reused.Hash != ready.Hash) throw new Exception("Verified download not reused");
         async Task Reject(ReleaseInfo bad, FakeHandler handler, string folder) {
             try { await UpdateInstaller.DownloadCoreAsync(bad, CancellationToken.None,handler,Path.Combine(root,folder)); }
             catch(InvalidDataException) { return; } throw new Exception("Unsafe download accepted: " + folder);
@@ -38,8 +41,13 @@ internal static class InstallerTests
     }
     private sealed class FakeHandler(byte[] bytes, Uri? redirect=null): HttpMessageHandler
     {
-        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request,CancellationToken token) => Task.FromResult(
+        public int Calls;
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request,CancellationToken token)
+        {
+            Calls++;
+            return Task.FromResult(
             redirect is null ? new HttpResponseMessage(HttpStatusCode.OK){Content=new ByteArrayContent(bytes)} :
                 new HttpResponseMessage(HttpStatusCode.Redirect){Headers={Location=redirect}});
+        }
     }
 }

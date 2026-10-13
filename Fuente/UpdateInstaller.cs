@@ -55,6 +55,15 @@ internal static class UpdateInstaller
             string payload = Path.Combine(directory, "descarga.part");
             using var client = new HttpClient(handler) { Timeout = TimeSpan.FromMinutes(10) };
             client.DefaultRequestHeaders.UserAgent.ParseAdd("NitroPulse/" + AppVersion.Display);
+            // Reuse the verified payload across restarts, validating the executable again.
+            if (File.Exists(payload) && new FileInfo(payload).Length == asset.Size &&
+                Hash(payload).Equals(asset.Sha256, StringComparison.OrdinalIgnoreCase))
+            {
+                string reused = Path.Combine(directory, "NitroPulse.exe");
+                if (asset.Zip) ExtractExecutable(payload, reused); else File.Copy(payload, reused, true);
+                ValidateExecutable(reused, release.Version);
+                return new(release, reused, Hash(reused));
+            }
             Uri location = asset.Download;
             for (int redirects = 0; ; redirects++)
             {

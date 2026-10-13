@@ -15,3 +15,4 @@ foreach (var url in new[]{"http://github.com/test/NitroPulse/releases/tag/v1.0.1
 }
 Console.WriteLine($"PASS: {count} pruebas de versiones, repositorios y enlaces seguros.");
 await InstallerTests.Run();
+await QueryTests.Run();

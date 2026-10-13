@@ -1,5 +1,7 @@
 # Componentes de terceros
 
+Lucide: iconos SVG oficiales del repositorio https://github.com/lucide-icons/lucide, referencia exacta en Fuente/Resources/Lucide/README.md. Se incluyen copias PNG derivadas para los botones, sin consultas de red en ejecución. Avisos ISC y MIT/Feather conservados en Lucide.txt.
+
 La licencia MIT de NitroPulse cubre únicamente su código propio, documentación e icono. No sustituye las siguientes licencias. Las bibliotecas se usan sin modificar.
 
 | Componente | Versión | Licencia / fuente correspondiente |

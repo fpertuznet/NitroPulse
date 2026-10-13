@@ -8,9 +8,11 @@ namespace NitroPulse;
 internal sealed record UpdateSettings(string Repository = "", bool Automatic = true);
 internal sealed record UpdateAsset(Uri Download, long Size, string Sha256, bool Zip);
 internal sealed record ReleaseInfo(Version Version, string Tag, Uri Page, UpdateAsset? Asset = null);
+internal sealed record UpdateQueryState(string Repository, DateTimeOffset NextAllowed, string? Json = null, string? Error = null);
 
 internal static class UpdateChecker
 {
+    private static readonly SemaphoreSlim QueryLock = new(1, 1);
     private static readonly string SettingsPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "NitroPulse", "actualizaciones.json");
 
     public static UpdateSettings Load()
@@ -83,18 +85,74 @@ internal static class UpdateChecker
     }
 
     public static async Task<ReleaseInfo?> LatestAsync(string repository, CancellationToken cancellation)
+        => await LatestCoreAsync(repository, cancellation, new HttpClientHandler { AllowAutoRedirect = false },
+            Path.Combine(Path.GetDirectoryName(SettingsPath)!, "consulta_actualizaciones.json"), DateTimeOffset.UtcNow);
+
+    internal static DateTimeOffset RetryAt(HttpResponseMessage response, DateTimeOffset now)
     {
-        if (!TryRepository(repository, out var normalized)) throw new ArgumentException("Indica el repositorio como usuario/NitroPulse o su URL de GitHub.");
-        using var handler = new HttpClientHandler { AllowAutoRedirect = false };
+        var next = now.AddMinutes(1);
+        if (response.Headers.RetryAfter?.Delta is { } delay && now.Add(delay) > next) next = now.Add(delay);
+        if (response.Headers.RetryAfter?.Date is { } date && date > next) next = date;
+        if (response.Headers.TryGetValues("x-ratelimit-remaining", out var remaining) && remaining.Contains("0") &&
+            response.Headers.TryGetValues("x-ratelimit-reset", out var reset) && long.TryParse(reset.FirstOrDefault(), out long seconds))
+        {
+            try { var dateReset = DateTimeOffset.FromUnixTimeSeconds(seconds); if (dateReset > next) next = dateReset; }
+            catch (ArgumentOutOfRangeException) { }
+        }
+        return next;
+    }
+
+    internal static async Task<ReleaseInfo?> LatestCoreAsync(string repository, CancellationToken cancellation,
+        HttpMessageHandler handler, string statePath, DateTimeOffset now)
+    {
         using var client = new HttpClient(handler) { Timeout = TimeSpan.FromSeconds(12), MaxResponseContentBufferSize = 1024 * 1024 };
+        if (!TryRepository(repository, out var normalized)) throw new ArgumentException("Indica el repositorio como usuario/NitroPulse o su URL de GitHub.");
+        await QueryLock.WaitAsync(cancellation);
+        try
+        {
+        UpdateQueryState? state = null;
+        try { if (File.Exists(statePath)) state = JsonSerializer.Deserialize<UpdateQueryState>(File.ReadAllText(statePath)); }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or JsonException) { }
+        if (state is not null && state.Repository.Equals(normalized, StringComparison.OrdinalIgnoreCase) && state.NextAllowed > now)
+        {
+            if (state.Json is not null) return Parse(state.Json, normalized);
+            throw new InvalidOperationException((state.Error ?? "Consulta en espera.") + " Próxima consulta: " + state.NextAllowed.ToLocalTime().ToString("g"));
+        }
+        void Store(UpdateQueryState value)
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(statePath))!);
+            string temp = statePath + ".tmp";
+            File.WriteAllText(temp, JsonSerializer.Serialize(value));
+            File.Move(temp, statePath, overwrite: true);
+        }
+        // Persist before requesting: restarting the application must not cause a tight retry loop.
+        Store(new(normalized, now.AddMinutes(1), Error: "La consulta anterior no se completó."));
         client.DefaultRequestHeaders.UserAgent.ParseAdd("NitroPulse/" + AppVersion.Display);
         client.DefaultRequestHeaders.Accept.ParseAdd("application/vnd.github+json");
         client.DefaultRequestHeaders.Add("X-GitHub-Api-Version", "2022-11-28");
         using var response = await client.GetAsync("https://api.github.com/repos/" + normalized + "/releases/latest", cancellation);
-        if (response.StatusCode == HttpStatusCode.NotFound) throw new InvalidOperationException("El repositorio no existe, es privado o todavía no tiene una versión publicada en Releases.");
         if (response.StatusCode is HttpStatusCode.Forbidden or HttpStatusCode.TooManyRequests)
-            throw new InvalidOperationException("GitHub limita temporalmente las consultas. Inténtalo más tarde.");
+        {
+            bool limited = response.StatusCode == HttpStatusCode.TooManyRequests || response.Headers.RetryAfter is not null ||
+                (response.Headers.TryGetValues("x-ratelimit-remaining", out var quota) && quota.Contains("0"));
+            string error = limited ? "GitHub limita temporalmente las consultas." : "GitHub denegó el acceso; revisa los permisos o el estado del repositorio.";
+            var next = RetryAt(response, now);
+            if (!limited && next < now.AddHours(6)) next = now.AddHours(6);
+            Store(new(normalized, next, Error: error));
+            throw new InvalidOperationException(error + " Próxima consulta: " + next.ToLocalTime().ToString("g"));
+        }
+        if (response.StatusCode == HttpStatusCode.NotFound)
+        {
+            const string error = "El repositorio no existe, es privado o todavía no tiene una versión publicada en Releases.";
+            Store(new(normalized, now.AddHours(6), Error: error));
+            throw new InvalidOperationException(error);
+        }
         response.EnsureSuccessStatusCode();
-        return Parse(await response.Content.ReadAsStringAsync(cancellation), normalized);
+        string json = await response.Content.ReadAsStringAsync(cancellation);
+        var release = Parse(json, normalized);
+        Store(new(normalized, now.AddHours(6), json));
+        return release;
+        }
+        finally { QueryLock.Release(); }
     }
 }

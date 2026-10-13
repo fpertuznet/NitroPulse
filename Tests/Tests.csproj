@@ -5,6 +5,10 @@
     <Product>NitroPulse</Product><Version>1.0.12</Version>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Remove="Bars/**/*.cs" />
+    <Compile Remove="Network/**/*.cs" />
+    <Compile Remove="NetworkUI/**/*.cs" />
+    <Compile Remove="Notices/**/*.cs" />
     <Compile Include="../Fuente/AppVersion.cs" Link="AppVersion.cs" />
     <Compile Include="../Fuente/UpdateChecker.cs" Link="UpdateChecker.cs" />
     <Compile Include="../Fuente/UpdateInstaller.cs" Link="UpdateInstaller.cs" />

@@ -1,6 +1,8 @@
 # NitroPulse — guía de uso
 
-La guía actual está en README.md. Para actualizaciones automáticas, consulta ACTUALIZACIONES.md. NitroPulse es código abierto bajo MIT; las dependencias conservan sus licencias.
+La guía actual está en README.md. Para localizar cada versión local y sus informes, consulta VERSIONES.md. Para actualizaciones automáticas, consulta ACTUALIZACIONES.md. NitroPulse es código abierto bajo MIT; las dependencias conservan sus licencias.
+
+Versión 1.0.16 solo local: abre Aplicacion/Versiones/1.0.16/NitroPulse.exe. La pestaña «Privacidad y licencias» contiene los avisos integrados. Consulta PRIVACIDAD.md y PUBLICACION.md antes de compartir diagnósticos o publicar una versión.
 
 El nuevo icono aparece en el ejecutable y en la ventana principal. Iconos contiene el original PNG y el ICO con tamaños de 16 a 256 píxeles. Los indicadores de temperatura y uso junto al reloj conservan sus números y barras.
 

@@ -261,20 +261,27 @@ internal static class TrayIconRenderer
         }
     }
 
-    private static void DrawBar(Graphics g, int size, Color bright, double? percentage)
+    internal static void DrawBar(Graphics g, int size, Color bright, double? percentage)
     {
         g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.None;
         Color dark = bright == Theme.Cpu ? CpuDark : bright == Theme.Gpu ? GpuDark : RamDark;
         using var background = new SolidBrush(dark);
         using var fill = new SolidBrush(bright);
-        using var border = new Pen(Color.FromArgb(210, 218, 230), Math.Max(1, size <= 20 ? 1 : 2));
+        int borderWidth = size <= 20 ? 1 : 2;
+        using var border = new SolidBrush(Color.FromArgb(210, 218, 230));
+        int innerSize = size - 2 * borderWidth;
         g.FillRectangle(background, 0, 0, size, size);
         if (percentage.HasValue)
         {
-            int used = (int)Math.Round(size * Math.Clamp(percentage.Value, 0, 100) / 100d, MidpointRounding.AwayFromZero);
-            if (used > 0) g.FillRectangle(fill, 0, size - used, size, used);
+            // Quantize downward inside the border: only 100% may appear completely full.
+            double percent = double.IsFinite(percentage.Value) ? Math.Clamp(percentage.Value, 0, 100) : 0;
+            int used = (int)Math.Floor(innerSize * percent / 100d);
+            if (used > 0) g.FillRectangle(fill, borderWidth, borderWidth + innerSize - used, innerSize, used);
         }
-        g.DrawRectangle(border, 0, 0, size - 1, size - 1);
+        g.FillRectangle(border, 0, 0, size, borderWidth);
+        g.FillRectangle(border, 0, size - borderWidth, size, borderWidth);
+        g.FillRectangle(border, 0, 0, borderWidth, size);
+        g.FillRectangle(border, size - borderWidth, 0, borderWidth, size);
     }
 
     private static void DrawTemperature(Graphics g, int size, Color accent, string value)
