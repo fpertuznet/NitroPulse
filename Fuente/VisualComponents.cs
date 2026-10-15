@@ -77,6 +77,7 @@ internal sealed class MetricCard : Control
 
 internal sealed class HistoryPlot : Control
 {
+    private readonly PlotNavigation _navigation = new(300);
     private readonly bool _temperatures;
     private readonly List<MetricSnapshot> _history;
     public HistoryPlot(bool temperatures, List<MetricSnapshot> history)
@@ -86,6 +87,7 @@ internal sealed class HistoryPlot : Control
         DoubleBuffered = true;
         Margin = new Padding(5);
         BackColor = Theme.Panel;
+        Controls.Add(_navigation); _navigation.Bind(this);
     }
 
     protected override void OnPaint(PaintEventArgs e)
@@ -98,7 +100,9 @@ internal sealed class HistoryPlot : Control
         using var panelPath = MetricCard.Rounded(new Rectangle(0, 0, Width - 1, Height - 1), 13);
         g.FillPath(bg, panelPath);
         g.DrawPath(border, panelPath);
-        if (Width < 200 || Height < 100) return;
+        if (Width < 200 || Height < 140) return;
+        _navigation.SetTimes(_history.Select(s => s.Timestamp.Ticks).ToArray());
+        var samples = _history.Skip(_navigation.View.Start).Take(_navigation.View.Count).ToArray();
 
         using var titleFont = new Font("Segoe UI", 10f, FontStyle.Bold);
         using var tiny = new Font("Segoe UI", 8f);
@@ -125,7 +129,7 @@ internal sealed class HistoryPlot : Control
             keyX += 61;
         }
 
-        var area = new RectangleF(42, 47, Width - 57, Height - 79);
+        var area = new RectangleF(42, 47, Width - 57, Height - 84 - _navigation.Height);
         const float maxPercent = 100f;
         float topValue = _temperatures ? 110f : maxPercent;
         using var gridPen = new Pen(Theme.Border, 1);
@@ -137,9 +141,11 @@ internal sealed class HistoryPlot : Control
             g.DrawString(_temperatures ? $"{label:0}°" : $"{label:0}%", tiny, muted, 6, y - 7);
         }
 
-        if (_history.Count > 1)
+        if (samples.Length > 1)
         {
-            var samples = _history.TakeLast(300).ToArray();
+            var start = samples[0].Timestamp;
+            var end = samples[^1].Timestamp;
+            double seconds = Math.Max(1, (end - start).TotalSeconds);
             void DrawSeries(Func<MetricSnapshot, double?> selector, Color color)
             {
                 using var pen = new Pen(color, 2.2f) { LineJoin = LineJoin.Round, StartCap = LineCap.Round, EndCap = LineCap.Round };
@@ -148,10 +154,10 @@ internal sealed class HistoryPlot : Control
                 {
                     var yValue = selector(samples[i]);
                     if (yValue is null) { last = null; continue; }
-                    var x = area.Left + (float)i * area.Width / Math.Max(1, samples.Length - 1);
+                    var x = area.Left + (float)((samples[i].Timestamp - start).TotalSeconds / seconds) * area.Width;
                     var y = area.Bottom - (float)(Math.Clamp(yValue.Value, 0, topValue) / topValue) * area.Height;
                     var now = new PointF(x, y);
-                    if (last.HasValue) g.DrawLine(pen, last.Value, now);
+                    if (last.HasValue && i > 0 && (samples[i].Timestamp - samples[i - 1].Timestamp).TotalSeconds is >= 0 and <= 6) g.DrawLine(pen, last.Value, now);
                     last = now;
                 }
             }
@@ -166,8 +172,17 @@ internal sealed class HistoryPlot : Control
                 DrawSeries(s => s.GpuPercent, Theme.Gpu);
                 DrawSeries(s => s.RamPercent, Theme.Ram);
             }
+            for (int i = 0; i <= 4; i++)
+            {
+                var at = start.AddSeconds(seconds * i / 4);
+                g.DrawString(at.ToString("HH:mm"), tiny, muted, area.Left + area.Width * i / 4 - 14, area.Bottom + 3);
+            }
         }
-        g.DrawString("Historial reciente · 10 min", tiny, muted, 16, Height - 22);
+        string state = _navigation.View.IsLive ? "En vivo" : "Historial";
+        string range = samples.Length == 0 ? "Esperando datos" : $"{samples[0].Timestamp:dd/MM HH:mm} — {samples[^1].Timestamp:dd/MM HH:mm}";
+        using var footerFormat = new StringFormat { Trimming = StringTrimming.EllipsisCharacter, FormatFlags = StringFormatFlags.NoWrap };
+        g.DrawString($"{state} · {range} · Arrastra / rueda", tiny, muted,
+            new RectangleF(16, Height - _navigation.Height - 18, Math.Max(1, Width - 32), 16), footerFormat);
     }
 }
 
@@ -264,6 +279,19 @@ internal static class TrayIconRenderer
     internal static void DrawBar(Graphics g, int size, Color bright, double? percentage)
     {
         g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.None;
+        if (percentage is double saturated && double.IsFinite(saturated) && saturated >= 100)
+        {
+            // Exact threshold, without rounding: 99.99% must remain a bar. The glyph replaces it.
+            g.Clear(Color.Transparent);
+            using var warning = new SolidBrush(bright);
+            int width = Math.Max(3, (int)Math.Round(size * .24));
+            int dot = Math.Max(2, (int)Math.Round(size * .18));
+            int gap = Math.Max(2, (int)Math.Round(size * .10));
+            int x = (size - width) / 2;
+            g.FillRectangle(warning, x, 0, width, size - dot - gap);
+            g.FillRectangle(warning, x, size - dot, width, dot);
+            return;
+        }
         Color dark = bright == Theme.Cpu ? CpuDark : bright == Theme.Gpu ? GpuDark : RamDark;
         using var background = new SolidBrush(dark);
         using var fill = new SolidBrush(bright);
@@ -283,6 +311,19 @@ internal static class TrayIconRenderer
         g.FillRectangle(border, 0, 0, borderWidth, size);
         g.FillRectangle(border, size - borderWidth, 0, borderWidth, size);
     }
+
+    internal static string CacheKey(TrayMetricKind kind, double? value, string text)
+    {
+        if (kind == TrayMetricKind.TemperatureNumber) return text;
+        if (value is not double percent || !double.IsFinite(percent)) return "bar:unknown";
+        if (percent >= 100) return "!";
+        // Rebuild only when a frame's pixel height changes, but never merge 99.x with saturation.
+        return "bar:" + string.Join(',', Resolutions.Select(size =>
+            (int)Math.Floor((size - 2 * (size <= 20 ? 1 : 2)) * Math.Clamp(percent, 0, 100) / 100)));
+    }
+
+    internal static string PercentText(double value) =>
+        (value is >= 0 and < 100 ? Math.Floor(value * 100) / 100 : value).ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
 
     private static void DrawTemperature(Graphics g, int size, Color accent, string value)
     {

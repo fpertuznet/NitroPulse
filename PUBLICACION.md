@@ -17,3 +17,11 @@ El 13 de octubre de 2026 Fabian informó que GitHub retiró la restricción y au
 Políticas: https://docs.github.com/en/site-policy
 Releases: https://docs.github.com/en/repositories/releasing-projects-on-github/about-releases
 API: https://docs.github.com/en/rest/using-the-rest-api/best-practices-for-using-the-rest-api
+
+## Control previo de 1.0.17 — 15 de octubre de 2026
+
+- Cambios limitados a navegación de gráficas, retención acotada en memoria, indicadores de uso, pruebas y documentación. No se añaden proveedores de sensores, instalaciones, permisos, destinos de red ni consultas al actualizador.
+- README conserva el enlace a la página de Releases y no incorpora enlaces directos de descarga de ejecutables.
+- Compilaciones y registros se excluyen de Git. La publicación selecciona archivos concretos de código, pruebas y documentación; no incorpora diagnósticos personales.
+- El ejecutable de Windows x64 se distribuye únicamente como adjunto de la Release, con SHA256 y límites de validación declarados. Los avisos y licencias permanecen integrados y las fuentes de terceros siguen referenciadas.
+- Este control reduce riesgos identificados, pero no equivale a aprobación de GitHub, certificación antimalware ni garantía contra restricciones futuras. Cualquier nueva instrucción de Soporte prevalece para este caso.

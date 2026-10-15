@@ -8,7 +8,7 @@
     <LangVersion>latest</LangVersion>
     <AssemblyName>NitroPulse</AssemblyName>
     <RootNamespace>NitroPulse</RootNamespace>
-    <Version>1.0.16</Version>
+    <Version>1.0.17</Version>
     <GitHubRepository>fpertuznet/NitroPulse</GitHubRepository>
     <ApplicationIcon>Resources/NitroPulse.ico</ApplicationIcon>
     <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>

@@ -113,7 +113,8 @@ internal sealed class NetworkMonitor : IDisposable
             if (_latest is not null && _latest.Assessment != assessment) Event(at, "Cambio de estado", assessment);
             var sample = new NetworkSample(at, current.Id, context, probes, assessment);
             current.Add(sample); _latest = sample; _lastAt = at;
-            _history.Add(sample); if (_history.Count > 360) _history.RemoveAt(0);
+            // At most two hours at the normal five-second cadence; logging remains unchanged.
+            _history.Add(sample); if (_history.Count > 1440) _history.RemoveAt(0);
             if (probes.Length == 0)
                 _readings.WriteLine(NetworkAssessment.Csv(at.ToString("O"), current.Id.ToString(), current.Name, "Sin prueba", "", "", "Inconclusive", "", "", "", "", assessment));
             foreach (var probe in probes)

@@ -2,8 +2,8 @@
 
 Organizadas el 11 de octubre de 2026 en `C:\Users\info\Documents\NitroPulse`.
 
-La versión más reciente disponible aquí es **1.0.16** (solo local):
-`Aplicacion\Versiones\1.0.16\NitroPulse.exe`.
+La versión local más reciente disponible aquí es **1.0.17**:
+`Aplicacion\Versiones\1.0.17\NitroPulse.exe`.
 Antes de abrirla, cierra cualquier otra versión desde **Salir** en su menú junto al reloj.
 
 Los archivos que estaban sueltos en `Aplicacion` se trasladaron a `Aplicacion\Versiones\1.0.14`, comprobando que coincidían con el respaldo existente. Ya no hay ejecutables sueltos en `Aplicacion`. No se instaló ninguna actualización ni se modificó el inicio automático de Windows; cualquier acceso directo a la ruta anterior debe apuntar ahora al ejecutable de la versión elegida.
@@ -22,7 +22,8 @@ NitroPulse/
       1.0.13/                      Ejecutable
       1.0.14/                      Ejecutable y símbolos, sin duplicados sueltos
       1.0.15/                      Ejecutable anterior
-      1.0.16/                      Privacidad, licencias y espera de API; solo local
+      1.0.16/                      Privacidad, licencias y espera de API
+      1.0.17/                      Historial desplazable y alerta de uso al 100%
       SHA256SUMS.txt               Huellas de ejecutables y biblioteca antigua
   Documentacion/
     Versiones/
@@ -32,7 +33,7 @@ NitroPulse/
       1.0.12/VALIDACION.md
       1.0.14/VALIDACION.md
       1.0.15/VALIDACION.md
-  Fuente/                          Código actual 1.0.16
+  Fuente/                          Código actual 1.0.17
   Tests/                           Pruebas de recursos, red, avisos y actualizaciones
   Iconos/                          Imágenes e icono del proyecto
   Licencias/                       Licencias y avisos de terceros
@@ -55,6 +56,8 @@ La copia técnica antigua presenta `FileVersion 1.0.5.0`. Se conservaron sus 54 
 | 1.0.13 | [Abrir carpeta](Aplicacion/Versiones/1.0.13/) | No encontrado | Sin informe individual encontrado |
 | 1.0.14 | [Abrir carpeta](Aplicacion/Versiones/1.0.14/) | No encontrado | [Validación](Documentacion/Versiones/1.0.14/VALIDACION.md) |
 | 1.0.15 | [Abrir carpeta](Aplicacion/Versiones/1.0.15/) | No encontrado | [Validación](Documentacion/Versiones/1.0.15/VALIDACION.md) |
+| 1.0.16 | [Abrir carpeta](Aplicacion/Versiones/1.0.16/) | No encontrado | [Validación](Documentacion/Versiones/1.0.16/VALIDACION.md) |
+| 1.0.17 | [Abrir carpeta](Aplicacion/Versiones/1.0.17/) | Ejecutable desde [Releases](https://github.com/fpertuznet/NitroPulse/releases) | [Validación](Documentacion/Versiones/1.0.17/VALIDACION.md) |
 
 Este inventario refleja únicamente los archivos locales encontrados. No acredita una publicación en GitHub. Los paquetes 1.0.9, 1.0.10 y 1.0.11 conservan sus fuentes históricas dentro del ZIP; no se mezclaron con `Fuente/`. No se encontraron aquí paquetes anteriores a 1.0.9.
 

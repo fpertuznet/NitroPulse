@@ -1,6 +1,6 @@
-# Estabilidad de red — NitroPulse 1.0.16
+# Estabilidad de red — NitroPulse 1.0.17
 
-Descarga NitroPulse desde la página de Releases y selecciona la pestaña **Red** (o el acceso Red / Internet del menú junto al reloj). En este proyecto local el ejecutable está en `Aplicacion/Versiones/1.0.16/NitroPulse.exe`. **Recursos** permanece en su propia pestaña. El monitoreo comienza al abrir NitroPulse, sigue al minimizarlo y guarda datos cada 5 segundos. **Pausar red** detiene estas pruebas sin detener los sensores; **Pausar registro** de Recursos solo afecta los registros de recursos.
+Descarga NitroPulse desde la página de Releases y selecciona la pestaña **Red** (o el acceso Red / Internet del menú junto al reloj). En este proyecto local el ejecutable está en `Aplicacion/Versiones/1.0.17/NitroPulse.exe`. **Recursos** permanece en su propia pestaña. El monitoreo comienza al abrir NitroPulse, sigue al minimizarlo y guarda datos cada 5 segundos. **Pausar red** detiene estas pruebas sin detener los sensores; **Pausar registro** de Recursos solo afecta los registros de recursos.
 
 ## Qué mide
 
@@ -27,7 +27,11 @@ Pausas, suspensión y huecos de observación mayores de 15 segundos no se contab
 
 ## Gráfica en vivo
 
-Conserva hasta 30 minutos (360 muestras): ping al router, Cloudflare y Google, más media, máximo, variación y porcentaje de ecos sin respuesta del tramo actual hacia 1.1.1.1. Una cruz roja indica eco sin respuesta; no se dibuja como 0ms ni se une la curva a través de pérdidas. Las líneas tampoco se unen entre tramos ni a través de pausas.
+Conserva hasta 1.440 muestras en memoria (aproximadamente dos horas de mediciones, a cinco segundos por muestra), con una ventana de 360 muestras. Las pausas pueden hacer que ese conjunto abarque más tiempo de reloj. Usa la barra horizontal, arrastra la gráfica o gira la rueda para consultar el historial. Las flechas desplazan; Inicio va a la primera muestra disponible y Fin o **En vivo** vuelve al final. La vista histórica permanece anclada aunque lleguen mediciones; si la muestra más antigua sale del límite de retención, avanza a la primera disponible. No se cargan automáticamente registros de sesiones anteriores.
+
+Las estadísticas corresponden al último tramo visible, no a otro tramo en vivo fuera de pantalla: ping al router, Cloudflare y Google, más media, máximo, variación y porcentaje de ecos sin respuesta hacia 1.1.1.1. Una cruz roja indica eco sin respuesta; no se dibuja como 0ms ni se une la curva a través de pérdidas. Las líneas tampoco se unen entre tramos ni a través de pausas. Las gráficas de Recursos tienen la misma navegación, con hasta 3.600 muestras retenidas y una ventana de 300.
+
+La gráfica PNG exportada corresponde a la ventana que se está viendo, con sus controles de navegación. Los CSV del informe conservan todas las mediciones de la sesión; navegar no pausa ni altera el registro.
 
 Las marcas ámbar señalan cambios/reconexiones y muestran la etiqueta de la red. El sombreado rojo señala ausencia de enlace o fallo simultáneo de las dos conexiones TCP; si no hay ruta IPv4 se muestra una advertencia ámbar, no una conclusión sobre IPv6. Pasar el puntero muestra el detalle de la muestra más cercana en el tiempo. La interfaz se actualiza cada segundo y las pruebas se toman cada cinco segundos.
 

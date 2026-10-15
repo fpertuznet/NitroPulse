@@ -5,6 +5,7 @@ namespace NitroPulse;
 internal sealed class NetworkPlot : Control
 {
     private readonly NetworkMonitor _monitor;
+    private readonly PlotNavigation _navigation = new(360);
     private readonly ToolTip _tooltip = new() { AutoPopDelay = 16000 };
     private NetworkSample[] _samples = Array.Empty<NetworkSample>();
     private DateTimeOffset _from, _to;
@@ -13,6 +14,7 @@ internal sealed class NetworkPlot : Control
     internal NetworkPlot(NetworkMonitor monitor)
     {
         _monitor = monitor; DoubleBuffered = true; BackColor = Theme.Panel; ForeColor = Theme.Text;
+        Controls.Add(_navigation); _navigation.Bind(this);
         MouseMove += (_, e) =>
         {
             if (_samples.Length == 0 || _area.Width <= 1) return;
@@ -25,21 +27,24 @@ internal sealed class NetworkPlot : Control
     protected override void OnPaint(PaintEventArgs e)
     {
         base.OnPaint(e); var g = e.Graphics;
-        g.SmoothingMode = SmoothingMode.AntiAlias; _samples = _monitor.History();
+        g.SmoothingMode = SmoothingMode.AntiAlias;
+        var history = _monitor.History();
+        _navigation.SetTimes(history.Select(s => s.At.UtcDateTime.Ticks).ToArray());
+        _samples = history.Skip(_navigation.View.Start).Take(_navigation.View.Count).ToArray();
         using var font = new Font("Segoe UI", 8); using var title = new Font("Segoe UI Semibold", 10, FontStyle.Bold);
         using var text = new SolidBrush(Theme.Text); using var muted = new SolidBrush(Theme.Muted);
-        g.DrawString("ESTABILIDAD DE PING · hasta 30 min", title, text, 14, 10);
-        g.DrawString(NetworkTimeline.Summary(_samples), font, muted, 14, 32);
+        g.DrawString("ESTABILIDAD DE PING · " + (_navigation.View.IsLive ? "en vivo" : "historial"), title, text, 14, 10);
+        g.DrawString(NetworkTimeline.Summary(_samples, !_navigation.View.IsLive), font, muted, 14, 32);
         var series = new[] { ("Router", Theme.Ram), ("Cloudflare", Theme.Cpu), ("Google", Google) };
         int legendX = 16;
         foreach (var (name, color) in series)
         { using var pen = new Pen(color, 2); g.DrawLine(pen, legendX, 56, legendX + 20, 56); g.DrawString(name, font, muted, legendX + 25, 48); legendX += 115; }
         g.DrawString("× ping sin respuesta (no equivale a caída general)", font, muted, legendX, 48);
-        var area = new RectangleF(58, 76, Math.Max(1, Width - 78), Math.Max(20, Height - 132));
+        var area = new RectangleF(58, 76, Math.Max(1, Width - 78), Math.Max(20, Height - 132 - _navigation.Height));
         double maximum = Math.Max(100, Math.Ceiling((_samples.SelectMany(s => s.Probes).Where(p => p.Protocol == "ICMP" && p.State == ProbeState.Ok)
             .Select(p => p.Milliseconds ?? 0).DefaultIfEmpty().Max()) / 50) * 50);
         var end = _samples.LastOrDefault()?.At ?? DateTimeOffset.Now;
-        var start = _samples.Length == 0 ? end.AddMinutes(-2) : (end - _samples[0].At).TotalMinutes < 2 ? end.AddMinutes(-2) : end.AddMinutes(-30) > _samples[0].At ? end.AddMinutes(-30) : _samples[0].At;
+        var start = _samples.Length == 0 || (end - _samples[0].At).TotalMinutes < 2 ? end.AddMinutes(-2) : _samples[0].At;
         _from = start; _to = end; _area = area;
         float X(DateTimeOffset at) => area.Left + (float)((at - start).TotalSeconds / Math.Max(1, (end - start).TotalSeconds)) * area.Width;
         float Y(double ms) => area.Bottom - (float)(ms / maximum) * area.Height;
@@ -88,7 +93,7 @@ internal sealed class NetworkPlot : Control
             previous = sample;
         }
         if (_samples.Length == 0) g.DrawString("El historial aparecerá tras la primera medición.", font, muted, area.Left + 12, area.Top + 40);
-        g.DrawString("Ámbar: cambio/reconexión · rojo: enlace/TCP falló · las pausas y pérdidas no se unen", font, muted, 14, Height - 17);
+        g.DrawString($"{start:dd/MM HH:mm} — {end:dd/MM HH:mm} · Arrastra / rueda para desplazarte · ámbar: cambio · rojo: fallo", font, muted, 14, Height - _navigation.Height - 17);
     }
     protected override void Dispose(bool disposing) { if (disposing) _tooltip.Dispose(); base.Dispose(disposing); }
 }

@@ -368,7 +368,7 @@ internal sealed class MonitorForm : Form
     private void UpdateUi(MetricSnapshot s, List<ProcessSample>? processes)
     {
         _history.Add(s);
-        if (_history.Count > 350) _history.RemoveRange(0, _history.Count - 350);
+        if (_history.Count > 3600) _history.RemoveRange(0, _history.Count - 3600);
         string Pct(double? val) => val.HasValue ? Math.Round(val.Value).ToString(CultureInfo.InvariantCulture) + "%" : "—";
         string Degrees(double? val) => val.HasValue ? Math.Round(val.Value).ToString(CultureInfo.InvariantCulture) + "°" : "—";
         _cards[0].SetValue(Pct(s.CpuPercent), "8 núcleos · 12 hilos", s.CpuPercent);
@@ -399,18 +399,19 @@ internal sealed class MonitorForm : Form
         for (int i = 0; i < values.Length; i++)
         {
             bool isTemperature = IconKinds[i] == TrayMetricKind.TemperatureNumber;
-            string exactValue = values[i].HasValue ? Math.Round(values[i]!.Value).ToString(CultureInfo.InvariantCulture) : "--";
+            string exactValue = !values[i].HasValue ? "--" : isTemperature ? Math.Round(values[i]!.Value).ToString(CultureInfo.InvariantCulture) : TrayIconRenderer.PercentText(values[i]!.Value);
             string tooltip = $"NitroPulse | {IconLabels[i]}: " +
                 (values[i].HasValue ? exactValue + (isTemperature ? " °C" : " %") : "sin sensor");
             // On temperatures >= 100C show HI instead of an incorrect 2-digit number.
             string iconText = isTemperature && values[i] >= 100 ? "HI" : exactValue;
-            if (_lastTrayText[i] != iconText)
+            string renderKey = TrayIconRenderer.CacheKey(IconKinds[i], values[i], iconText);
+            if (_lastTrayText[i] != renderKey)
             {
                 var tray = _trayIcons[i];
                 var oldIcon = tray.Icon;
                 tray.Icon = TrayIconRenderer.Create(iconText, IconColors[i], IconKinds[i], values[i]);
                 oldIcon?.Dispose();
-                _lastTrayText[i] = iconText;
+                _lastTrayText[i] = renderKey;
             }
             _trayIcons[i].Text = tooltip.Length > 63 ? tooltip[..63] : tooltip;
         }
