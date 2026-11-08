@@ -17,12 +17,18 @@ internal static class UpdateChecker
 
     public static UpdateSettings Load()
     {
+        // Repository is always the one baked into the build; only Automatic is persisted.
+        bool automatic = true;
         try
         {
-            if (File.Exists(SettingsPath)) return JsonSerializer.Deserialize<UpdateSettings>(File.ReadAllText(SettingsPath)) ?? new(AppVersion.DefaultRepository);
+            if (File.Exists(SettingsPath))
+            {
+                var loaded = JsonSerializer.Deserialize<UpdateSettings>(File.ReadAllText(SettingsPath));
+                if (loaded is not null) automatic = loaded.Automatic;
+            }
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or JsonException) { }
-        return new(AppVersion.DefaultRepository);
+        return new(AppVersion.DefaultRepository, automatic);
     }
 
     public static void Save(UpdateSettings settings)

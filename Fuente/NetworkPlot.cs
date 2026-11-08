@@ -10,7 +10,8 @@ internal sealed class NetworkPlot : Control
     private NetworkSample[] _samples = Array.Empty<NetworkSample>();
     private DateTimeOffset _from, _to;
     private RectangleF _area;
-    private static readonly Color Google = Color.FromArgb(96, 165, 250);
+    private static readonly Color GoogleLight = Color.FromArgb(37, 99, 235);
+    private static readonly Color GoogleDark = Color.FromArgb(96, 165, 250);
     internal NetworkPlot(NetworkMonitor monitor)
     {
         _monitor = monitor; DoubleBuffered = true; BackColor = Theme.Panel; ForeColor = Theme.Text;
@@ -28,18 +29,22 @@ internal sealed class NetworkPlot : Control
     {
         base.OnPaint(e); var g = e.Graphics;
         g.SmoothingMode = SmoothingMode.AntiAlias;
+        BackColor = Theme.Panel;
+        using var panelBg = new SolidBrush(Theme.Panel);
+        using var panelPath = MetricCard.Rounded(new Rectangle(0, 0, Width - 1, Height - 1), 14);
+        g.FillPath(panelBg, panelPath);
         var history = _monitor.History();
         _navigation.SetTimes(history.Select(s => s.At.UtcDateTime.Ticks).ToArray());
         _samples = history.Skip(_navigation.View.Start).Take(_navigation.View.Count).ToArray();
-        using var font = new Font("Segoe UI", 8); using var title = new Font("Segoe UI Semibold", 10, FontStyle.Bold);
         using var text = new SolidBrush(Theme.Text); using var muted = new SolidBrush(Theme.Muted);
-        g.DrawString("ESTABILIDAD DE PING · " + (_navigation.View.IsLive ? "en vivo" : "historial"), title, text, 14, 10);
-        g.DrawString(NetworkTimeline.Summary(_samples, !_navigation.View.IsLive), font, muted, 14, 32);
-        var series = new[] { ("Router", Theme.Ram), ("Cloudflare", Theme.Cpu), ("Google", Google) };
+        g.DrawString("ESTABILIDAD DE PING · " + (_navigation.View.IsLive ? "en vivo" : "historial"), Theme.FontBold, text, 14, 10);
+        g.DrawString(NetworkTimeline.Summary(_samples, !_navigation.View.IsLive), Theme.FontSmall, muted, 14, 32);
+        Color google = Theme.IsDark ? GoogleDark : GoogleLight;
+        var series = new[] { ("Router", Theme.Ram), ("Cloudflare", Theme.Cpu), ("Google", google) };
         int legendX = 16;
         foreach (var (name, color) in series)
-        { using var pen = new Pen(color, 2); g.DrawLine(pen, legendX, 56, legendX + 20, 56); g.DrawString(name, font, muted, legendX + 25, 48); legendX += 115; }
-        g.DrawString("× ping sin respuesta (no equivale a caída general)", font, muted, legendX, 48);
+        { using var pen = new Pen(color, 2); g.DrawLine(pen, legendX, 56, legendX + 20, 56); g.DrawString(name, Theme.FontSmall, muted, legendX + 25, 48); legendX += 115; }
+        g.DrawString("× ping sin respuesta (no equivale a caída general)", Theme.FontSmall, muted, legendX, 48);
         var area = new RectangleF(58, 76, Math.Max(1, Width - 78), Math.Max(20, Height - 132 - _navigation.Height));
         double maximum = Math.Max(100, Math.Ceiling((_samples.SelectMany(s => s.Probes).Where(p => p.Protocol == "ICMP" && p.State == ProbeState.Ok)
             .Select(p => p.Milliseconds ?? 0).DefaultIfEmpty().Max()) / 50) * 50);
@@ -48,13 +53,13 @@ internal sealed class NetworkPlot : Control
         _from = start; _to = end; _area = area;
         float X(DateTimeOffset at) => area.Left + (float)((at - start).TotalSeconds / Math.Max(1, (end - start).TotalSeconds)) * area.Width;
         float Y(double ms) => area.Bottom - (float)(ms / maximum) * area.Height;
-        using var grid = new Pen(Theme.Border, 1);
+        using var grid = new Pen(Theme.Grid, 1);
         for (int i = 0; i <= 4; i++)
         {
             float y = area.Top + area.Height * i / 4; g.DrawLine(grid, area.Left, y, area.Right, y);
-            g.DrawString((maximum * (4 - i) / 4).ToString("0") + " ms", font, muted, 4, y - 6);
+            g.DrawString((maximum * (4 - i) / 4).ToString("0") + " ms", Theme.FontSmall, muted, 4, y - 6);
             var tick = start.AddSeconds((end - start).TotalSeconds * i / 4); float x = area.Left + area.Width * i / 4;
-            g.DrawString(tick.ToString("HH:mm:ss"), font, muted, x - 26, area.Bottom + 25);
+            g.DrawString(tick.ToString("HH:mm:ss"), Theme.FontSmall, muted, x - 26, area.Bottom + 25);
         }
         NetworkSample? previous = null; int markerCount = 0;
         foreach (var sample in _samples)
@@ -71,7 +76,7 @@ internal sealed class NetworkPlot : Control
                 using var marker = new Pen(Theme.Ram, 1) { DashStyle = DashStyle.Dash }; g.DrawLine(marker, x, area.Top, x, area.Bottom + 18);
                 string label = previous.Context.LabelKey == sample.Context.LabelKey ? "Reconexión / pausa" : _monitor.NameFor(sample.Context);
                 // Every transition stays marked; alternate compact labels to avoid hiding the curves.
-                g.DrawString(label.Length > 22 ? label[..21] + "…" : label, font, muted, Math.Clamp(x + 3, area.Left, Math.Max(area.Left, area.Right - 145)), area.Top + (markerCount++ % 3) * 15);
+                g.DrawString(label.Length > 22 ? label[..21] + "…" : label, Theme.FontSmall, muted, Math.Clamp(x + 3, area.Left, Math.Max(area.Left, area.Right - 145)), area.Top + (markerCount++ % 3) * 15);
             }
             foreach (var (name, color) in series)
             {
@@ -92,8 +97,8 @@ internal sealed class NetworkPlot : Control
             }
             previous = sample;
         }
-        if (_samples.Length == 0) g.DrawString("El historial aparecerá tras la primera medición.", font, muted, area.Left + 12, area.Top + 40);
-        g.DrawString($"{start:dd/MM HH:mm} — {end:dd/MM HH:mm} · Arrastra / rueda para desplazarte · ámbar: cambio · rojo: fallo", font, muted, 14, Height - _navigation.Height - 17);
+        if (_samples.Length == 0) g.DrawString("El historial aparecerá tras la primera medición.", Theme.FontSmall, muted, area.Left + 12, area.Top + 40);
+        g.DrawString($"{start:dd/MM HH:mm} — {end:dd/MM HH:mm} · Arrastra / rueda para desplazarte · ámbar: cambio · rojo: fallo", Theme.FontSmall, muted, 14, Height - _navigation.Height - 17);
     }
     protected override void Dispose(bool disposing) { if (disposing) _tooltip.Dispose(); base.Dispose(disposing); }
 }

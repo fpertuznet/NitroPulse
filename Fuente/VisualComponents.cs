@@ -8,15 +8,15 @@ namespace NitroPulse;
 internal sealed class MetricCard : Control
 {
     private string _header;
-    private readonly Color _accent;
+    private readonly MetricAccent _accentKind;
     private string _value = "—";
     private string _detail = "Esperando datos";
     private double? _percentage;
 
-    public MetricCard(string header, Color accent)
+    public MetricCard(string header, MetricAccent accent)
     {
         _header = header;
-        _accent = accent;
+        _accentKind = accent;
         DoubleBuffered = true;
         Margin = new Padding(5);
         MinimumSize = new Size(128, 126);
@@ -38,24 +38,21 @@ internal sealed class MetricCard : Control
         g.SmoothingMode = SmoothingMode.AntiAlias;
         g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit;
         var rect = new Rectangle(0, 0, Width - 1, Height - 1);
+        Color accent = Theme.Accent(_accentKind);
         using var bg = new SolidBrush(Theme.Panel);
-        using var border = new Pen(Theme.Border, 1);
-        using var rectPath = Rounded(rect, 13);
+        using var rectPath = Rounded(rect, 14);
         g.FillPath(bg, rectPath);
-        g.DrawPath(border, rectPath);
-        using var accentBrush = new SolidBrush(_accent);
-        g.FillRectangle(accentBrush, 17, 17, 8, 8);
-        using var headerFont = new Font("Segoe UI", 9.5f, FontStyle.Bold);
-        using var bigFont = new Font("Segoe UI Semibold", 24, FontStyle.Bold);
-        using var smallFont = new Font("Segoe UI", 8f);
+        using var accentBrush = new SolidBrush(accent);
+        // Gaming accent rail — cheap solid fill, no glow.
+        g.FillRectangle(accentBrush, 0, 14, 4, Height - 28);
         using var white = new SolidBrush(Theme.Text);
         using var muted = new SolidBrush(Theme.Muted);
-        g.DrawString(_header, headerFont, muted, 30, 12);
-        g.DrawString(_value, bigFont, white, 14, 38);
-        var detailRect = new RectangleF(17, 92, Math.Max(0, Width - 30), 18);
-        g.DrawString(_detail, smallFont, muted, detailRect);
-        var track = new Rectangle(17, Height - 17, Math.Max(4, Width - 34), 5);
-        using var trackBrush = new SolidBrush(Theme.Border);
+        g.DrawString(_header, Theme.FontBold, muted, 18, 12);
+        g.DrawString(_value, Theme.FontValue, white, 16, 36);
+        var detailRect = new RectangleF(18, 92, Math.Max(0, Width - 32), 18);
+        g.DrawString(_detail, Theme.FontSmall, muted, detailRect);
+        var track = new Rectangle(18, Height - 18, Math.Max(4, Width - 36), 6);
+        using var trackBrush = new SolidBrush(Theme.Grid);
         g.FillRectangle(trackBrush, track);
         if (_percentage.HasValue)
             g.FillRectangle(accentBrush, track.X, track.Y,
@@ -96,19 +93,15 @@ internal sealed class HistoryPlot : Control
         var g = e.Graphics;
         g.SmoothingMode = SmoothingMode.AntiAlias;
         using var bg = new SolidBrush(Theme.Panel);
-        using var border = new Pen(Theme.Border);
-        using var panelPath = MetricCard.Rounded(new Rectangle(0, 0, Width - 1, Height - 1), 13);
+        using var panelPath = MetricCard.Rounded(new Rectangle(0, 0, Width - 1, Height - 1), 14);
         g.FillPath(bg, panelPath);
-        g.DrawPath(border, panelPath);
         if (Width < 200 || Height < 140) return;
         _navigation.SetTimes(_history.Select(s => s.Timestamp.Ticks).ToArray());
         var samples = _history.Skip(_navigation.View.Start).Take(_navigation.View.Count).ToArray();
 
-        using var titleFont = new Font("Segoe UI", 10f, FontStyle.Bold);
-        using var tiny = new Font("Segoe UI", 8f);
         using var textBrush = new SolidBrush(Theme.Text);
         using var muted = new SolidBrush(Theme.Muted);
-        g.DrawString(_temperatures ? "Temperaturas" : "Uso de recursos", titleFont, textBrush, 16, 12);
+        g.DrawString(_temperatures ? "Temperaturas" : "Uso de recursos", Theme.FontBold, textBrush, 16, 12);
         int keyX = _temperatures ? 160 : 156;
         if (_temperatures)
         {
@@ -125,20 +118,20 @@ internal sealed class HistoryPlot : Control
         {
             using var dot = new SolidBrush(accent);
             g.FillEllipse(dot, keyX, 20, 7, 7);
-            g.DrawString(label, tiny, muted, keyX + 10, 14);
+            g.DrawString(label, Theme.FontSmall, muted, keyX + 10, 14);
             keyX += 61;
         }
 
         var area = new RectangleF(42, 47, Width - 57, Height - 84 - _navigation.Height);
         const float maxPercent = 100f;
         float topValue = _temperatures ? 110f : maxPercent;
-        using var gridPen = new Pen(Theme.Border, 1);
+        using var gridPen = new Pen(Theme.Grid, 1);
         for (int i = 0; i <= 4; i++)
         {
             float y = area.Bottom - area.Height * i / 4;
             g.DrawLine(gridPen, area.Left, y, area.Right, y);
             float label = topValue * i / 4;
-            g.DrawString(_temperatures ? $"{label:0}°" : $"{label:0}%", tiny, muted, 6, y - 7);
+            g.DrawString(_temperatures ? $"{label:0}°" : $"{label:0}%", Theme.FontSmall, muted, 6, y - 7);
         }
 
         if (samples.Length > 1)
@@ -148,7 +141,7 @@ internal sealed class HistoryPlot : Control
             double seconds = Math.Max(1, (end - start).TotalSeconds);
             void DrawSeries(Func<MetricSnapshot, double?> selector, Color color)
             {
-                using var pen = new Pen(color, 2.2f) { LineJoin = LineJoin.Round, StartCap = LineCap.Round, EndCap = LineCap.Round };
+                using var pen = new Pen(color, 2.1f) { LineJoin = LineJoin.Round, StartCap = LineCap.Round, EndCap = LineCap.Round };
                 PointF? last = null;
                 for (int i = 0; i < samples.Length; i++)
                 {
@@ -175,13 +168,13 @@ internal sealed class HistoryPlot : Control
             for (int i = 0; i <= 4; i++)
             {
                 var at = start.AddSeconds(seconds * i / 4);
-                g.DrawString(at.ToString("HH:mm"), tiny, muted, area.Left + area.Width * i / 4 - 14, area.Bottom + 3);
+                g.DrawString(at.ToString("HH:mm"), Theme.FontSmall, muted, area.Left + area.Width * i / 4 - 14, area.Bottom + 3);
             }
         }
         string state = _navigation.View.IsLive ? "En vivo" : "Historial";
         string range = samples.Length == 0 ? "Esperando datos" : $"{samples[0].Timestamp:dd/MM HH:mm} — {samples[^1].Timestamp:dd/MM HH:mm}";
         using var footerFormat = new StringFormat { Trimming = StringTrimming.EllipsisCharacter, FormatFlags = StringFormatFlags.NoWrap };
-        g.DrawString($"{state} · {range} · Arrastra / rueda", tiny, muted,
+        g.DrawString($"{state} · {range} · Arrastra / rueda", Theme.FontSmall, muted,
             new RectangleF(16, Height - _navigation.Height - 18, Math.Max(1, Width - 32), 16), footerFormat);
     }
 }
@@ -205,9 +198,6 @@ internal static class TrayIconRenderer
     private static extern bool DestroyIcon(IntPtr handle);
 
     private static readonly int[] Resolutions = { 16, 20, 24, 32, 40, 48, 64 };
-    private static readonly Color CpuDark = Color.FromArgb(12, 55, 25);
-    private static readonly Color GpuDark = Color.FromArgb(76, 15, 22);
-    private static readonly Color RamDark = Color.FromArgb(67, 37, 18);
 
     public static Icon Create(string value, Color accent, TrayMetricKind kind, double? percentage = null)
     {
@@ -278,7 +268,7 @@ internal static class TrayIconRenderer
 
     internal static void DrawBar(Graphics g, int size, Color bright, double? percentage)
     {
-        g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.None;
+        g.SmoothingMode = SmoothingMode.None;
         if (percentage is double saturated && double.IsFinite(saturated) && saturated >= 100)
         {
             // Exact threshold, without rounding: 99.99% must remain a bar. The glyph replaces it.
@@ -292,11 +282,15 @@ internal static class TrayIconRenderer
             g.FillRectangle(warning, x, size - dot, width, dot);
             return;
         }
-        Color dark = bright == Theme.Cpu ? CpuDark : bright == Theme.Gpu ? GpuDark : RamDark;
+        Color dark = Color.FromArgb(
+            Math.Max(0, bright.R / 5),
+            Math.Max(0, bright.G / 5),
+            Math.Max(0, bright.B / 5));
         using var background = new SolidBrush(dark);
         using var fill = new SolidBrush(bright);
         int borderWidth = size <= 20 ? 1 : 2;
-        using var border = new SolidBrush(Color.FromArgb(210, 218, 230));
+        Color edge = Theme.IsDark ? Color.FromArgb(210, 218, 230) : Color.FromArgb(40, 48, 64);
+        using var border = new SolidBrush(edge);
         int innerSize = size - 2 * borderWidth;
         g.FillRectangle(background, 0, 0, size, size);
         if (percentage.HasValue)
@@ -327,7 +321,7 @@ internal static class TrayIconRenderer
 
     private static void DrawTemperature(Graphics g, int size, Color accent, string value)
     {
-        g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.HighQuality;
+        g.SmoothingMode = SmoothingMode.HighQuality;
         g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAliasGridFit;
         string glyph = value;
         if (int.TryParse(value, out int temperature))

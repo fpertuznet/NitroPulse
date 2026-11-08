@@ -65,11 +65,14 @@ internal static class DependencyBootstrap
             }
             if (!IsElevated())
             {
+                // Logon/auto-start must never show UAC on every boot. Prefer an elevated Scheduled Task
+                // (StartupManager). If this process is still non-elevated with --minimized, continue safe.
+                if (Has("--minimized")) return Result.Safe;
+
                 var start = new ProcessStartInfo(Environment.ProcessPath ?? throw new IOException("No se encuentra NitroPulse.exe."))
                 { UseShellExecute = true, Verb = "runas" };
                 start.ArgumentList.Add("--bootstrap-relaunch");
                 if (setup) start.ArgumentList.Add("--setup-pawnio");
-                if (Has("--minimized")) start.ArgumentList.Add("--minimized");
                 using var child = Process.Start(start) ?? throw new IOException("No se pudo abrir NitroPulse como administrador.");
                 return Result.Relaunched;
             }

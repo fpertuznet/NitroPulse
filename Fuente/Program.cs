@@ -10,6 +10,32 @@ internal static class Program
     private static void Main()
     {
         var args = Environment.GetCommandLineArgs();
+        if (args.Any(a => a.Equals("--startup-enable", StringComparison.OrdinalIgnoreCase)))
+        {
+            try
+            {
+                StartupManager.ApplyEnabled(true);
+                Environment.ExitCode = 0;
+            }
+            catch
+            {
+                Environment.ExitCode = 1;
+            }
+            return;
+        }
+        if (args.Any(a => a.Equals("--startup-disable", StringComparison.OrdinalIgnoreCase)))
+        {
+            try
+            {
+                StartupManager.ApplyEnabled(false);
+                Environment.ExitCode = 0;
+            }
+            catch
+            {
+                Environment.ExitCode = 1;
+            }
+            return;
+        }
         int checkArg = Array.FindIndex(args, a => a.Equals("--check-dependencies", StringComparison.OrdinalIgnoreCase));
         if (checkArg >= 0 && checkArg + 1 < args.Length)
         {
@@ -62,12 +88,15 @@ internal static class Program
         }
 
         ApplicationConfiguration.Initialize();
+        Theme.Initialize();
         var bootstrap = DependencyBootstrap.Prepare(args);
         if (bootstrap == DependencyBootstrap.Result.Relaunched)
         {
             singleton.ReleaseMutex();
             return;
         }
+        if (bootstrap == DependencyBootstrap.Result.Direct)
+            StartupManager.MigrateLegacyIfNeeded();
         Application.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException);
         Application.ThreadException += (_, e) =>
         {

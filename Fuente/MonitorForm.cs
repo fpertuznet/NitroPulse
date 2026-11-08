@@ -13,8 +13,9 @@ internal sealed class MonitorForm : Form
     private readonly ProcessSampler _processSampler = new();
     private readonly CsvLogger _logger = new();
     private readonly NetworkMonitor _network;
-    private readonly TabControl _pages;
+    private readonly FlatTabHost _pages;
     private readonly NetworkPanel _networkPanel;
+    private readonly SettingsPanel _settingsPanel;
     private readonly List<MetricSnapshot> _history = new();
     private readonly List<NotifyIcon> _trayIcons = new();
     private readonly string[] _lastTrayText = new string[5];
@@ -25,13 +26,19 @@ internal sealed class MonitorForm : Form
     private readonly Label _status;
     private readonly Label _footer;
     private readonly Label _sensorAlert;
+    private readonly Label _heading;
+    private readonly Label _tagline;
+    private readonly Label _processLabel;
+    private readonly Panel _header;
+    private readonly Panel _lowerPanel;
+    private readonly TableLayoutPanel _root;
     private readonly Button _pauseButton;
     private readonly System.Windows.Forms.Timer _timer = new() { Interval = 2000 };
     private readonly System.Windows.Forms.Timer _updateTimer = new() { Interval = 21600000 };
     private readonly CancellationTokenSource _updateCancellation = new();
     private bool _checkingUpdate;
     private ReadyUpdate? _readyUpdate;
-    private readonly Button _installUpdate = new() { Text = "Actualización disponible · Instalar", Visible = false, AutoSize = true, BackColor = Theme.Cpu, ForeColor = Color.Black, FlatStyle = FlatStyle.Flat };
+    private readonly Button _installUpdate = new() { Text = "Actualización disponible · Instalar", Visible = false, AutoSize = true, FlatStyle = FlatStyle.Flat };
     private ToolStripMenuItem? _installUpdateMenu;
     private readonly ContextMenuStrip _trayMenu = new();
     private ToolStripMenuItem? _toggleLogging;
@@ -49,7 +56,6 @@ internal sealed class MonitorForm : Form
     private long _lastAutoSaveSamples;
 
     // Tray order requested by the user: CPU C, GPU C, CPU %, GPU %, RAM %.
-    private static readonly Color[] IconColors = { Theme.CpuTemp, Theme.GpuTemp, Theme.Cpu, Theme.Gpu, Theme.Ram };
     private static readonly string[] IconLabels = { "Temperatura CPU", "Temperatura GPU", "Uso CPU", "Uso GPU", "Uso RAM" };
     private static readonly TrayMetricKind[] IconKinds =
     {
@@ -62,6 +68,7 @@ internal sealed class MonitorForm : Form
 
     public MonitorForm(bool safeMode = true)
     {
+        Theme.Initialize();
         _hardware = new HardwareReader(safeMode);
         _network = new NetworkMonitor(_logger.SessionDirectory);
         Text = "NitroPulse " + AppVersion.Display + " · Recursos y red";
@@ -69,77 +76,83 @@ internal sealed class MonitorForm : Form
         Size = new Size(1080, 780);
         MinimumSize = new Size(855, 650);
         StartPosition = FormStartPosition.CenterScreen;
-        BackColor = Theme.Bg;
-        ForeColor = Theme.Text;
-        Font = new Font("Segoe UI", 9.5f);
+        Font = Theme.FontBody;
 
-        _pages = NitroTabs.Create();
-        var resourcesPage = new TabPage("Recursos") { BackColor = Theme.Bg };
-        var networkPage = new TabPage("Red") { BackColor = Theme.Bg };
+        _pages = new FlatTabHost { Dock = DockStyle.Fill };
+        var resourcesPage = new Panel { Dock = DockStyle.Fill, BackColor = Theme.Bg };
+        var networkPage = new Panel { Dock = DockStyle.Fill, BackColor = Theme.Bg };
         _networkPanel = new NetworkPanel(_network); networkPage.Controls.Add(_networkPanel);
-        _pages.TabPages.Add(resourcesPage); _pages.TabPages.Add(networkPage); Controls.Add(_pages);
-        var noticesPage = new TabPage("Privacidad y licencias") { BackColor = Theme.Bg };
-        noticesPage.Controls.Add(new NoticesPanel()); _pages.TabPages.Add(noticesPage);
+        var settingsPage = new Panel { Dock = DockStyle.Fill, BackColor = Theme.Bg };
+        _settingsPanel = new SettingsPanel(ExportAsync, () => _hardware.SensorReport(), SaveSensorReport, SetReadyUpdate);
+        settingsPage.Controls.Add(_settingsPanel);
+        _pages.Add("Recursos", resourcesPage, "monitor");
+        _pages.Add("Red", networkPage, "network");
+        _pages.Add("Configuración", settingsPage, "settings");
+        Controls.Add(_pages);
         // Resource monitoring remains independent of the network tab.
-        var root = new TableLayoutPanel
+        _root = new TableLayoutPanel
         {
             Dock = DockStyle.Fill,
             ColumnCount = 1,
             RowCount = 5,
-            Padding = new Padding(18, 12, 18, 8),
-            BackColor = Theme.Bg
+            Padding = new Padding(18, 12, 18, 8)
         };
-        root.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-        root.RowStyles.Add(new RowStyle(SizeType.Absolute, 74));
-        root.RowStyles.Add(new RowStyle(SizeType.Absolute, 144));
-        root.RowStyles.Add(new RowStyle(SizeType.Absolute, 228));
-        root.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-        root.RowStyles.Add(new RowStyle(SizeType.Absolute, 53));
-        resourcesPage.Controls.Add(root);
+        _root.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        _root.RowStyles.Add(new RowStyle(SizeType.Absolute, 74));
+        _root.RowStyles.Add(new RowStyle(SizeType.Absolute, 144));
+        _root.RowStyles.Add(new RowStyle(SizeType.Absolute, 228));
+        _root.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        _root.RowStyles.Add(new RowStyle(SizeType.Absolute, 53));
+        resourcesPage.Controls.Add(_root);
 
-        var header = new Panel { Dock = DockStyle.Fill, BackColor = Theme.Bg };
-        var heading = new Label
+        _header = new Panel { Dock = DockStyle.Fill };
+        _heading = new Label
         {
-            Text = "NitroPulse", ForeColor = Theme.Text,
-            Font = new Font("Segoe UI Semibold", 22, FontStyle.Bold),
-            Location = new Point(7, 2), Size = new Size(320, 40)
+            Text = "NitroPulse",
+            Font = Theme.FontTitle,
+            AutoSize = true,
+            Location = new Point(4, 2)
         };
-        var tagline = new Label
+        _tagline = new Label
         {
-            Text = "Monitor en tiempo real · Windows 10/11 · datos locales",
-            ForeColor = Theme.Muted, Location = new Point(10, 43), AutoSize = true
+            Text = "Monitor en tiempo real",
+            AutoSize = true, Location = new Point(6, 42)
         };
         _status = new Label
         {
             Text = "● Inicializando sensores...", TextAlign = ContentAlignment.MiddleRight,
-            ForeColor = Theme.Cpu, AutoSize = false, Anchor = AnchorStyles.Top | AnchorStyles.Right,
-            Size = new Size(390, 32), Location = new Point(620, 17)
+            AutoSize = false, Anchor = AnchorStyles.Top | AnchorStyles.Right,
+            Size = new Size(390, 32), Location = new Point(620, 12)
         };
-        header.Resize += (_, _) => _status.Left = Math.Max(335, header.Width - _status.Width - 10);
-        header.Controls.AddRange(new Control[] { heading, tagline, _status });
-        _installUpdate.Location = new Point(335, 38);
+        _header.Resize += (_, _) =>
+        {
+            _status.Left = Math.Max(_heading.Right + 16, _header.Width - _status.Width - 8);
+            _installUpdate.Left = Math.Max(_heading.Right + 16, _header.Width - _installUpdate.Width - 8);
+        };
+        _header.Controls.AddRange(new Control[] { _heading, _tagline, _status });
+        _installUpdate.Location = new Point(335, 42);
         _installUpdate.Click += async (_, _) => await InstallUpdateAsync();
         LucideIcons.Apply(_installUpdate, "download");
-        header.Controls.Add(_installUpdate);
-        root.Controls.Add(header, 0, 0);
+        _header.Controls.Add(_installUpdate);
+        _root.Controls.Add(_header, 0, 0);
 
         var cardsPanel = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 5, RowCount = 1 };
         for (int i = 0; i < 5; i++) cardsPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 20));
         cardsPanel.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
         _cards = new[]
         {
-            new MetricCard("CPU", Theme.Cpu),
-            new MetricCard("GPU NVIDIA", Theme.Gpu),
-            new MetricCard("RAM", Theme.Ram),
-            new MetricCard("TEMP. CPU", Theme.CpuTemp),
-            new MetricCard("TEMP. GPU", Theme.GpuTemp)
+            new MetricCard("CPU", MetricAccent.Cpu),
+            new MetricCard("GPU NVIDIA", MetricAccent.Gpu),
+            new MetricCard("RAM", MetricAccent.Ram),
+            new MetricCard("TEMP. CPU", MetricAccent.CpuTemp),
+            new MetricCard("TEMP. GPU", MetricAccent.GpuTemp)
         };
         for (int i = 0; i < _cards.Length; i++)
         {
             _cards[i].Dock = DockStyle.Fill;
             cardsPanel.Controls.Add(_cards[i], i, 0);
         }
-        root.Controls.Add(cardsPanel, 0, 1);
+        _root.Controls.Add(cardsPanel, 0, 1);
 
         var charts = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1 };
         charts.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
@@ -149,42 +162,32 @@ internal sealed class MonitorForm : Form
         _tempPlot = new HistoryPlot(true, _history) { Dock = DockStyle.Fill };
         charts.Controls.Add(_loadPlot, 0, 0);
         charts.Controls.Add(_tempPlot, 1, 0);
-        root.Controls.Add(charts, 0, 2);
+        _root.Controls.Add(charts, 0, 2);
 
-        var lowerPanel = new Panel { Dock = DockStyle.Fill, Padding = new Padding(5, 7, 5, 0), BackColor = Theme.Bg };
-        var label = new Label
+        _lowerPanel = new Panel { Dock = DockStyle.Fill, Padding = new Padding(5, 7, 5, 0) };
+        _processLabel = new Label
         {
             Dock = DockStyle.Top, Height = 31, Text = "Procesos principales  ·  memoria y CPU (cada 15 segundos)",
-            Font = new Font("Segoe UI", 10, FontStyle.Bold), ForeColor = Theme.Text,
-            TextAlign = ContentAlignment.MiddleLeft
+            Font = Theme.FontBold, TextAlign = ContentAlignment.MiddleLeft
         };
         _processGrid = BuildGrid();
-        lowerPanel.Controls.Add(_processGrid);
-        lowerPanel.Controls.Add(label);
-        root.Controls.Add(lowerPanel, 0, 3);
+        _lowerPanel.Controls.Add(_processGrid);
+        _lowerPanel.Controls.Add(_processLabel);
+        _root.Controls.Add(_lowerPanel, 0, 3);
 
-        var footerPanel = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 5, RowCount = 1 };
+        var footerPanel = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1 };
         footerPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         footerPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 155));
-        footerPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 142));
-        footerPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 120));
-        footerPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 135));
-        _footer = new Label { ForeColor = Theme.Muted, Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleLeft };
-        _pauseButton = CreateButton("Pausar registro", Theme.PanelAlt, () => ToggleLogging());
-        var exportButton = CreateButton("Exportar ZIP", Theme.Gpu, async () => await ExportAsync());
-        var sensorButton = CreateButton("Ver sensores", Theme.PanelAlt, ShowSensors);
+        _footer = new Label { Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleLeft };
+        _pauseButton = CreateButton("Pausar registro", false, () => ToggleLogging());
         footerPanel.Controls.Add(_footer, 0, 0);
         footerPanel.Controls.Add(_pauseButton, 1, 0);
-        footerPanel.Controls.Add(exportButton, 2, 0);
-        footerPanel.Controls.Add(sensorButton, 3, 0);
-        footerPanel.Controls.Add(CreateButton("Actualizaciones", Theme.PanelAlt, ShowUpdates), 4, 0);
-        root.Controls.Add(footerPanel, 0, 4);
+        _root.Controls.Add(footerPanel, 0, 4);
 
         _sensorAlert = new Label
         {
-            ForeColor = Theme.Muted,
             Text = "— = sensor no disponible; puede requerir permisos de administrador.",
-            Font = new Font("Segoe UI", 8), Dock = DockStyle.Bottom, Height = 18,
+            Font = Theme.FontSmall, Dock = DockStyle.Bottom, Height = 18,
             TextAlign = ContentAlignment.MiddleRight
         };
         // Status note appears as footer tooltip as not to reduce process table space.
@@ -193,6 +196,10 @@ internal sealed class MonitorForm : Form
 
         SetupTrayMenu();
         SetupTrayIcons();
+        HandleCreated += (_, _) => WindowChrome.Apply(this);
+        ApplyTheme();
+        Theme.Changed += OnThemeChanged;
+        FormClosed += (_, _) => Theme.Changed -= OnThemeChanged;
         _timer.Tick += async (_, _) => await SampleAsync();
         _updateTimer.Tick += async (_, _) => await CheckUpdatesAsync();
         Shown += async (_, _) =>
@@ -208,16 +215,54 @@ internal sealed class MonitorForm : Form
         FormClosing += OnClosing;
     }
 
-    private static Button CreateButton(string text, Color back, Action action)
+    private void OnThemeChanged()
+    {
+        if (IsDisposed || _exiting) return;
+        if (InvokeRequired) { BeginInvoke(OnThemeChanged); return; }
+        ApplyTheme();
+        Array.Fill(_lastTrayText, null);
+    }
+
+    private void ApplyTheme()
+    {
+        BackColor = Theme.Bg;
+        ForeColor = Theme.Text;
+        Font = Theme.FontBody;
+        WindowChrome.Apply(this);
+        _pages.ApplyTheme();
+        _root.BackColor = Theme.Bg;
+        _header.BackColor = Theme.Bg;
+        _heading.ForeColor = Theme.Text;
+        _heading.Font = Theme.FontTitle;
+        _tagline.ForeColor = Theme.Muted;
+        _status.ForeColor = _logger.LoggingEnabled ? Theme.Cpu : Theme.Ram;
+        _lowerPanel.BackColor = Theme.Bg;
+        _processLabel.ForeColor = Theme.Text;
+        _processLabel.Font = Theme.FontBold;
+        _footer.ForeColor = Theme.Muted;
+        _sensorAlert.ForeColor = Theme.Muted;
+        Theme.StyleGrid(_processGrid);
+        Theme.StyleButton(_pauseButton);
+        Theme.StyleButton(_installUpdate, accent: true);
+        LucideIcons.Apply(_installUpdate, "download");
+        LucideIcons.Apply(_pauseButton, LucideIcons.ForText(_pauseButton.Text));
+        Theme.StyleMenu(_trayMenu);
+        RefreshTrayMenuIcons();
+        _networkPanel.ApplyTheme();
+        _settingsPanel.ApplyTheme();
+        foreach (var card in _cards) card.Invalidate();
+        _loadPlot.Invalidate();
+        _tempPlot.Invalidate();
+    }
+
+    private Button CreateButton(string text, bool accent, Action action, Color? back = null)
     {
         var b = new Button
         {
-            Text = text, BackColor = back, ForeColor = Theme.Text,
-            FlatStyle = FlatStyle.Flat, Dock = DockStyle.Fill,
-            Margin = new Padding(4, 5, 4, 5), Cursor = Cursors.Hand,
-            Font = new Font("Segoe UI", 9, FontStyle.Bold)
+            Text = text, Dock = DockStyle.Fill,
+            Margin = new Padding(4, 5, 4, 5)
         };
-        b.FlatAppearance.BorderSize = 0;
+        Theme.StyleButton(b, accent, back);
         LucideIcons.Apply(b, LucideIcons.ForText(text));
         b.Click += (_, _) => action();
         return b;
@@ -230,87 +275,85 @@ internal sealed class MonitorForm : Form
             Dock = DockStyle.Fill, ReadOnly = true, AllowUserToAddRows = false,
             AllowUserToDeleteRows = false, AllowUserToResizeRows = false,
             MultiSelect = false, RowHeadersVisible = false,
-            BackgroundColor = Theme.Panel, BorderStyle = BorderStyle.None,
-            GridColor = Theme.Border, CellBorderStyle = DataGridViewCellBorderStyle.SingleHorizontal,
-            EnableHeadersVisualStyles = false,
+            CellBorderStyle = DataGridViewCellBorderStyle.None,
             ColumnHeadersHeight = 34, RowTemplate = { Height = 29 },
             AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill,
             SelectionMode = DataGridViewSelectionMode.FullRowSelect,
         };
-        grid.ColumnHeadersDefaultCellStyle = new DataGridViewCellStyle
-        {
-            BackColor = Theme.PanelAlt, ForeColor = Theme.Text, SelectionBackColor = Theme.PanelAlt,
-            Font = new Font("Segoe UI", 9f, FontStyle.Bold), Padding = new Padding(5)
-        };
-        grid.DefaultCellStyle = new DataGridViewCellStyle
-        {
-            BackColor = Theme.Panel, ForeColor = Theme.Text,
-            SelectionBackColor = Color.FromArgb(54, 69, 96), SelectionForeColor = Theme.Text,
-            Font = new Font("Segoe UI", 9f), Padding = new Padding(5)
-        };
+        Theme.StyleGrid(grid);
         grid.Columns.Add("name", "Proceso");
         grid.Columns.Add("instances", "Instancias");
         grid.Columns.Add("ram", "RAM MB");
         grid.Columns.Add("private", "Privada MB");
         grid.Columns.Add("cpu", "CPU %");
-        grid.Columns[0].FillWeight = 160;
-        foreach (DataGridViewColumn column in grid.Columns.Cast<DataGridViewColumn>().Skip(1))
+        grid.Columns[0].FillWeight = 220;
+        grid.Columns[0].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleLeft;
+        grid.Columns[0].HeaderCell.Style.Alignment = DataGridViewContentAlignment.MiddleLeft;
+        // Numeric columns: header and values share the same right edge so they stay under their title.
+        float[] weights = { 70, 85, 95, 70 };
+        for (int i = 1; i < grid.Columns.Count; i++)
         {
-            column.FillWeight = 65;
+            var column = grid.Columns[i];
+            column.FillWeight = weights[i - 1];
             column.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
+            column.HeaderCell.Style.Alignment = DataGridViewContentAlignment.MiddleRight;
+            column.DefaultCellStyle.Padding = new Padding(6, 0, 14, 0);
+            column.HeaderCell.Style.Padding = new Padding(6, 0, 14, 0);
         }
         return grid;
     }
 
     private void SetupTrayMenu()
     {
-        var open = new ToolStripMenuItem("Abrir panel NitroPulse", null, (_, _) => ShowDashboard());
+        var open = new ToolStripMenuItem("Abrir panel", null, (_, _) => ShowDashboard());
         _toggleLogging = new ToolStripMenuItem("Pausar registro", null, (_, _) => ToggleLogging());
         _autoStart = new ToolStripMenuItem("Iniciar con Windows", null, (_, _) => ToggleStartup())
         {
-            Checked = StartupManager.Enabled, CheckOnClick = false
+            Checked = StartupManager.Enabled,
+            CheckOnClick = false,
+            ToolTipText = "Al activarlo, Windows puede pedir autorización una sola vez. Luego inicia minimizado con sensores, sin pedir administrador en cada arranque."
         };
+        _installUpdateMenu = new ToolStripMenuItem("Actualización disponible · Instalar", null, async (_, _) => await InstallUpdateAsync()) { Visible = false };
         _trayMenu.Items.Add(open);
         _trayMenu.Items.Add(_toggleLogging);
-        _trayMenu.Items.Add(new ToolStripMenuItem("Exportar sesión ZIP", null, async (_, _) => await ExportAsync()));
-        _trayMenu.Items.Add(new ToolStripMenuItem("Abrir carpeta de registros", null, (_, _) => OpenFolder(_logger.SessionDirectory)));
-        _trayMenu.Items.Add(new ToolStripMenuItem("Abrir copias automáticas", null, (_, _) =>
-        {
-            Directory.CreateDirectory(_logger.AutomaticBackupDirectory);
-            OpenFolder(_logger.AutomaticBackupDirectory);
-        }));
-        _trayMenu.Items.Add(new ToolStripMenuItem("Abrir copias finales", null, (_, _) =>
-        {
-            Directory.CreateDirectory(_logger.FinalBackupDirectory);
-            OpenFolder(_logger.FinalBackupDirectory);
-        }));
-        _trayMenu.Items.Add(new ToolStripMenuItem("Ver sensores detectados", null, (_, _) => ShowSensors()));
-        _trayMenu.Items.Add(new ToolStripMenuItem("Red / Internet · diagnóstico", null, (_, _) => ShowNetwork()));
-        _trayMenu.Items.Add(new ToolStripMenuItem("Actualizaciones · " + AppVersion.Display, null, (_, _) => ShowUpdates()));
-        _trayMenu.Items.Add(new ToolStripMenuItem("Privacidad y licencias", null, (_, _) => { _pages.SelectedIndex = 2; ShowDashboard(); }));
-        _installUpdateMenu = new ToolStripMenuItem("Actualización disponible · Instalar", null, async (_, _) => await InstallUpdateAsync()) { Visible = false };
-        _trayMenu.Items.Add(_installUpdateMenu);
+        _trayMenu.Items.Add(new ToolStripMenuItem("Configuración", null, (_, _) => OpenSettings(SettingsSection.Export)));
         _trayMenu.Items.Add(new ToolStripSeparator());
         _trayMenu.Items.Add(_autoStart);
-        _trayMenu.Items.Add(new ToolStripSeparator());
         _trayMenu.Items.Add(new ToolStripMenuItem("Salir", null, async (_, _) => await ExitAsync()));
         _trayMenu.ImageScalingSize = new Size(18, 18);
+        Theme.StyleMenu(_trayMenu);
+        RefreshTrayMenuIcons();
+    }
+
+    private void RefreshTrayMenuIcons()
+    {
         foreach (var item in _trayMenu.Items.OfType<ToolStripMenuItem>())
         {
             string caption = item.Text ?? "";
-            string icon = caption.StartsWith("Abrir panel") ? "monitor" : caption.StartsWith("Abrir") ? "folder-open" :
-                caption.StartsWith("Red") ? "network" : caption is "Salir" or "Iniciar con Windows" ? "power" : LucideIcons.ForText(caption);
-            item.Image = LucideIcons.Get(icon, item.ForeColor, 18);
+            string icon = caption.StartsWith("Abrir panel") ? "monitor" :
+                caption is "Salir" or "Iniciar con Windows" ? "power" :
+                caption.StartsWith("Configuración") ? "settings" :
+                LucideIcons.ForText(caption);
+            item.Image = LucideIcons.Get(icon, Theme.Text, 18);
+            Theme.StyleMenuItem(item);
         }
+    }
+
+    private void OpenSettings(SettingsSection section)
+    {
+        _pages.SelectedIndex = 2;
+        _settingsPanel.ShowSection(section);
+        ShowDashboard();
     }
 
     private void SetupTrayIcons()
     {
+        var accents = Theme.TrayAccents;
         for (int i = 0; i < IconLabels.Length; i++)
         {
             var icon = new NotifyIcon
             {
-                Icon = TrayIconRenderer.Create("--", IconColors[i], IconKinds[i], null),
+                Icon = TrayIconRenderer.Create("--", accents[i], IconKinds[i], null),
                 Text = $"NitroPulse · {IconLabels[i]}: esperando",
                 ContextMenuStrip = _trayMenu,
                 Visible = true
@@ -396,6 +439,7 @@ internal sealed class MonitorForm : Form
                 _processGrid.Rows.Add(p.Name, p.Instances, p.RamMB.ToString("N0"), p.PrivateMB.ToString("N0"), p.CpuPercent.ToString("0.0"));
         }
         double?[] values = { s.CpuTemperature, s.GpuTemperature, s.CpuPercent, s.GpuPercent, s.RamPercent };
+        var accents = Theme.TrayAccents;
         for (int i = 0; i < values.Length; i++)
         {
             bool isTemperature = IconKinds[i] == TrayMetricKind.TemperatureNumber;
@@ -404,12 +448,12 @@ internal sealed class MonitorForm : Form
                 (values[i].HasValue ? exactValue + (isTemperature ? " °C" : " %") : "sin sensor");
             // On temperatures >= 100C show HI instead of an incorrect 2-digit number.
             string iconText = isTemperature && values[i] >= 100 ? "HI" : exactValue;
-            string renderKey = TrayIconRenderer.CacheKey(IconKinds[i], values[i], iconText);
+            string renderKey = Theme.IsDark + ":" + accents[i].ToArgb() + ":" + TrayIconRenderer.CacheKey(IconKinds[i], values[i], iconText);
             if (_lastTrayText[i] != renderKey)
             {
                 var tray = _trayIcons[i];
                 var oldIcon = tray.Icon;
-                tray.Icon = TrayIconRenderer.Create(iconText, IconColors[i], IconKinds[i], values[i]);
+                tray.Icon = TrayIconRenderer.Create(iconText, accents[i], IconKinds[i], values[i]);
                 oldIcon?.Dispose();
                 _lastTrayText[i] = renderKey;
             }
@@ -447,7 +491,7 @@ internal sealed class MonitorForm : Form
         _logger.LoggingEnabled = !_logger.LoggingEnabled;
         _pauseButton.Text = _logger.LoggingEnabled ? "Pausar registro" : "Reanudar registro";
         LucideIcons.Apply(_pauseButton, _logger.LoggingEnabled ? "pause" : "play");
-        if (_toggleLogging is not null) { _toggleLogging.Text = _pauseButton.Text; _toggleLogging.Image = LucideIcons.Get(_logger.LoggingEnabled ? "pause" : "play", _toggleLogging.ForeColor, 18); }
+        if (_toggleLogging is not null) { _toggleLogging.Text = _pauseButton.Text; _toggleLogging.Image = LucideIcons.Get(_logger.LoggingEnabled ? "pause" : "play", Theme.Text, 18); }
     }
 
     private void ToggleStartup()
@@ -489,40 +533,6 @@ internal sealed class MonitorForm : Form
         catch (Exception e) { _logger.Error("Guardar diagnostico de sensores", e); }
     }
 
-    private void ShowSensors()
-    {
-        string report = _hardware.SensorReport();
-        SaveSensorReport(report);
-        using var dialog = new Form
-        {
-            Text = "NitroPulse · Sensores detectados", Size = new Size(800, 600),
-            StartPosition = FormStartPosition.CenterParent, BackColor = Theme.Bg,
-            ForeColor = Theme.Text, Font = new Font("Consolas", 9)
-        };
-        var view = new TextBox
-        {
-            Multiline = true, ScrollBars = ScrollBars.Both, WordWrap = false,
-            ReadOnly = true, Dock = DockStyle.Fill, BackColor = Theme.Panel,
-            ForeColor = Theme.Text, Text = report
-        };
-        var copy = CreateButton("Copiar diagnóstico", Theme.PanelAlt, () =>
-        {
-            try { Clipboard.SetText(report); }
-            catch (Exception e) { MessageBox.Show(e.Message, "Portapapeles", MessageBoxButtons.OK, MessageBoxIcon.Warning); }
-        });
-        copy.Dock = DockStyle.Bottom;
-        copy.Height = 43;
-        dialog.Controls.Add(view);
-        dialog.Controls.Add(copy);
-        dialog.ShowDialog(this);
-    }
-
-    private void ShowUpdates()
-    {
-        using var dialog = new UpdateDialog(SetReadyUpdate);
-        dialog.ShowDialog(this);
-    }
-
     private void ShowNetwork()
     {
         _pages.SelectedIndex = 1; _networkPanel.RefreshView(); ShowDashboard();
@@ -532,7 +542,7 @@ internal sealed class MonitorForm : Form
     {
         if (_checkingUpdate || _exiting) return;
         var settings = UpdateChecker.Load();
-        if (!settings.Automatic || !UpdateChecker.TryRepository(settings.Repository, out var repository)) return;
+        if (!settings.Automatic || !UpdateChecker.TryRepository(AppVersion.DefaultRepository, out var repository)) return;
         _checkingUpdate = true;
         try
         {
